@@ -135,6 +135,11 @@ describe("balances (BR-1, BR-2, BR-7, BR-9)", () => {
     const s = { ...sale("a", "2026-10-25", 1000), status: "cancelled" as const };
     expect(entryEffect(s)).toBe(0);
   });
+  it("superseded (edited) versions have zero effect", () => {
+    const old = { ...sale("a", "2026-10-25", 1000), status: "edited" as const };
+    expect(entryEffect(old)).toBe(0);
+    expect(partyBalance(0, [old, sale("a2", "2026-10-25", 800)])).toBe(R(800));
+  });
   it("bounced cheque reverses payment", () => {
     const p = pay("c", "2026-10-25", 1000, null, { paymentMode: "cheque", chequeBounced: true });
     expect(entryEffect(p)).toBe(0);

@@ -1,0 +1,19 @@
+{
+  "name": "@munim/db-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "NODE_USE_ENV_PROXY=1 NODE_NO_WARNINGS=1 vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@munim/ledger-core": "*",
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

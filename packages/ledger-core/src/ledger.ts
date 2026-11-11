@@ -4,7 +4,8 @@ import type { Entry } from "./types.js";
 
 /** Signed effect of an entry on what the party owes (+ = owes more). BR-1, BR-7, BR-9. */
 export function entryEffect(e: Entry): Paise {
-  if (e.status === "cancelled") return 0;
+  // Only the active version counts: "edited" = superseded old version, "cancelled" = voided (BR-7, FR-42).
+  if (e.status !== "active") return 0;
   const amount =
     e.lines && e.lines.length > 0 ? entryTotal({ lines: e.lines }).total : (e.amount ?? 0);
   switch (e.type) {
