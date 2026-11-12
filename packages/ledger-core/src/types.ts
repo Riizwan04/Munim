@@ -1,4 +1,4 @@
-import type { MilliQty, Paise } from "./money.js";
+import type { MilliQty, Paise } from "./money";
 
 export type EntryType = "sale" | "payment" | "charge" | "discount" | "return";
 export type EntryStatus = "active" | "edited" | "cancelled";

@@ -1,5 +1,5 @@
-import type { Paise } from "./money.js";
-import type { Entry } from "./types.js";
+import type { Paise } from "./money";
+import type { Entry } from "./types";
 
 /**
  * RATE POLICY (from the shop's real khata): every customer has their own

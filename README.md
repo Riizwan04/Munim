@@ -10,3 +10,14 @@ Voice-first AI accountant / credit ledger for small businesses. First preset: bu
 npm install
 npm test
 ```
+
+## Run the dealer app (Expo)
+
+```bash
+npm install
+cp .env.example apps/dealer/.env   # then fill in your Supabase URL + publishable key
+npm run seed                       # one-time: demo business with sample data
+cd apps/dealer && npx expo start   # scan the QR code with Expo Go
+```
+
+Demo login: `demo.dealer@example.com` / `Munim-demo-2026` (sample data only).

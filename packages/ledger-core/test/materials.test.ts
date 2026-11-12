@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchMaterial, validUnit, suggestRate, toMilliQty, rupeesToPaise as R, lineTotal, type MaterialRef, type Entry } from "../src/index.js";
+import { matchMaterial, validUnit, suggestRate, toMilliQty, rupeesToPaise as R, lineTotal, type MaterialRef, type Entry } from "../src/index";
 
 const mats: MaterialRef[] = [
   { id: "waddi", name: "Waddi", category: "Cement", localNames: [], units: ["bag"] },

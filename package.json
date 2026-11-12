@@ -2,9 +2,18 @@
   "name": "munim",
   "private": true,
   "version": "0.0.0",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "seed": "NODE_USE_ENV_PROXY=1 NODE_NO_WARNINGS=1 tsx scripts/seed-demo.ts"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.119.0",
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15"
   }
 }

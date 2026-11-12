@@ -1,6 +1,6 @@
-import { entryTotal } from "./entryTotals.js";
-import type { Paise } from "./money.js";
-import type { Entry } from "./types.js";
+import { entryTotal } from "./entryTotals";
+import type { Paise } from "./money";
+import type { Entry } from "./types";
 
 /** Signed effect of an entry on what the party owes (+ = owes more). BR-1, BR-7, BR-9. */
 export function entryEffect(e: Entry): Paise {

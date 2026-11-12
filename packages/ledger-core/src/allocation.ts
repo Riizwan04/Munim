@@ -1,6 +1,6 @@
-import { entryEffect } from "./ledger.js";
-import type { Paise } from "./money.js";
-import type { Entry } from "./types.js";
+import { entryEffect } from "./ledger";
+import type { Paise } from "./money";
+import type { Entry } from "./types";
 
 export interface DueItem {
   entryId: string; // "opening" for the opening balance

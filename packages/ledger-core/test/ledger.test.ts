@@ -4,7 +4,7 @@ import {
   siteBalances, creditLimitWarning, allocatePayments, oldestOutstandingDays,
   formatINR, groupIndian, toMilliQty, rupeesToPaise, divRound, roundToRupee,
   type Entry,
-} from "../src/index.js";
+} from "../src/index";
 
 const R = rupeesToPaise;
 

@@ -1,5 +1,5 @@
-import { divRound, assertInt, type Paise } from "./money.js";
-import type { EntryLine } from "./types.js";
+import { divRound, assertInt, type Paise } from "./money";
+import type { EntryLine } from "./types";
 
 /** FR-32 / BR-10: line = qty × rate (× (1+GST%) when GST on). Rounded once, to paise. */
 export function lineTotal(line: EntryLine): Paise {
