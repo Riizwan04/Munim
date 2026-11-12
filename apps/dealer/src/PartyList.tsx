@@ -5,7 +5,7 @@ import { rupee } from "./money";
 import { supabase } from "./supabase";
 import { FONT, useTheme } from "./theme";
 
-export function PartyList({ data, err, onOpen, onAdd, onRefresh }: { data: { business: string; parties: PartyRow[] } | null; err: string; onOpen: (p: PartyRow) => void; onAdd: () => void; onRefresh: () => Promise<void> }) {
+export function PartyList({ data, err, onOpen, onAdd, onVoice, onRefresh }: { data: { business: string; parties: PartyRow[] } | null; err: string; onOpen: (p: PartyRow) => void; onAdd: () => void; onVoice: () => void; onRefresh: () => Promise<void> }) {
   const t = useTheme();
   const state = data;
   const [refreshing, setRefreshing] = useState(false);
@@ -40,9 +40,14 @@ export function PartyList({ data, err, onOpen, onAdd, onRefresh }: { data: { bus
         <Pressable onPress={() => supabase.auth.signOut()} style={{ padding: 12 }}>
           <Text style={{ color: t.muted, fontSize: FONT.small }}>Logout</Text>
         </Pressable>
-        <Pressable onPress={onAdd} accessibilityRole="button" style={{ paddingHorizontal: 22, minHeight: 56, justifyContent: "center", borderRadius: 28, backgroundColor: t.paid }}>
-          <Text style={{ fontSize: FONT.body + 1, color: "#fff", fontWeight: "700" }}>+ Nayi entry</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable onPress={onAdd} accessibilityRole="button" style={{ paddingHorizontal: 18, minHeight: 56, justifyContent: "center", borderRadius: 28, borderWidth: 2, borderColor: t.paid }}>
+            <Text style={{ fontSize: FONT.body, color: t.paid, fontWeight: "700" }}>+ Entry</Text>
+          </Pressable>
+          <Pressable onPress={onVoice} accessibilityRole="button" style={{ paddingHorizontal: 22, minHeight: 56, justifyContent: "center", borderRadius: 28, backgroundColor: t.paid }}>
+            <Text style={{ fontSize: FONT.body + 1, color: "#fff", fontWeight: "700" }}>🎤 Bolo</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );

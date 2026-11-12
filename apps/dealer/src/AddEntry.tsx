@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import {
   buildDraft, creditLimitWarning, entryEffect, partyBalance, rateLooksUnusual, suggestRate,
-  type DraftLine, type Entry, type EntryType, type MaterialRef, type PaymentMode,
+  type DraftLine, type Entry, type EntryType, type MaterialRef, type PaymentMode, type Question, type ResolvedEntry,
 } from "@munim/ledger-core";
 import { createParty, createSite, editEntry, loadEntry, loadMaterials, loadPartyContext, saveEntry, type PartyRow } from "./data";
 import { rupee } from "./money";
@@ -19,12 +19,27 @@ const MODES: { k: PaymentMode; label: string }[] = [
 const today = () => new Date().toISOString().slice(0, 10);
 const blank = (): DraftLine => ({ qty: "", rate: "" });
 
+export function questionText(q: Question): string {
+  const n = (l: number) => `Item ${l + 1}`;
+  switch (q.kind) {
+    case "party": return q.options.length ? `Kaun se ${q.spoken}? Neeche se chuniye.` : q.spoken ? `"${q.spoken}" naam ki party nahi mili. Nayi party banayein?` : "Kis party ki entry hai?";
+    case "site": return `"${q.spoken}" site nahi mili. Chuniye ya nayi banaiye.`;
+    case "material": return q.options.length > 1 ? `${n(q.line)}: kaun sa ${q.spoken}? ${q.options.map((o) => o.name).join(" / ")}` : `${n(q.line)}: "${q.spoken}" nahi mila. Chuniye.`;
+    case "unit": return `${n(q.line)}: kis unit mein? (${q.options.join(" / ")})`;
+    case "quantity": return `${n(q.line)}: kitna?`;
+    case "rate": return `${n(q.line)}: rate batao (₹ per unit)`;
+    case "amount": return "Kitni rakam?";
+    case "mode": return "Kaise mila? Cash / UPI / Cheque / Bank";
+  }
+}
+
 interface Props {
+  prefill?: ResolvedEntry; transcript?: string; queueLabel?: string; onSkip?: () => void;
   businessId: string; parties: PartyRow[]; initialParty?: PartyRow; editingId?: string;
   onDone: (party: PartyRow | undefined) => void; onCancel: () => void;
 }
 
-export function AddEntry({ businessId, parties, initialParty, editingId, onDone, onCancel }: Props) {
+export function AddEntry({ businessId, parties, initialParty, editingId, onDone, onCancel, prefill, transcript, queueLabel, onSkip }: Props) {
   const t = useTheme();
   const [materials, setMaterials] = useState<MaterialRef[]>([]);
   const [party, setParty] = useState<PartyRow | undefined>(initialParty);
@@ -45,6 +60,17 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
   const [newSite, setNewSite] = useState<string | null>(null);
   const [partyList, setPartyList] = useState(parties);
 
+  useEffect(() => {
+    if (!prefill) return;
+    const p = partyList.find((x) => x.id === prefill.partyId);
+    if (p) setParty(p);
+    setSiteId(prefill.siteId ?? null); setType(prefill.type);
+    if (prefill.lines.length) { setLines(prefill.lines); setPick(prefill.lines.findIndex((l) => !l.materialId)); }
+    setAmount(prefill.amount); setMode(prefill.paymentMode ?? null);
+    const unk = prefill.questions.find((q) => q.kind === "party" && q.options.length === 0 && q.spoken);
+    if (unk && unk.kind === "party") setNewParty({ name: (unk.spoken ?? "").replace(/\b\w/g, (c) => c.toUpperCase()), phone: "" });
+    setTouched(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadMaterials().then(setMaterials).catch((e) => setErr(e.message)); }, []);
   useEffect(() => { if (party) loadPartyContext(party.id).then(setCtx).catch((e) => setErr(e.message)); }, [party]);
   useEffect(() => {
@@ -59,7 +85,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
 
   const isItems = type === "sale";
   const draft = useMemo(
-    () => party ? buildDraft({ businessId, partyId: party.id, siteId, type, date, lines: isItems ? lines : [], amount, paymentMode: mode }, materials) : null,
+    () => party ? buildDraft({ businessId, partyId: party.id, siteId, type, date, lines: isItems ? lines : [], amount, paymentMode: mode, source: prefill ? "voice" : "manual", transcript }, materials) : null,
     [party, businessId, siteId, type, date, lines, amount, mode, materials, isItems],
   );
   const cats = useMemo(() => [...new Set(materials.map((m) => m.category ?? "Other"))], [materials]);
@@ -113,6 +139,15 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }} keyboardShouldPersistTaps="handled">
         {err ? <Text style={{ color: t.due, fontSize: FONT.body }}>{err}</Text> : null}
+
+        {prefill && !review && (
+          <View style={{ gap: 6, padding: 12, borderRadius: 12, backgroundColor: t.surface, borderWidth: 2, borderColor: t.accent }}>
+            <Text style={{ fontSize: FONT.small, color: t.muted }}>{queueLabel ? `${queueLabel} · ` : ""}Maine suna: “{transcript}”</Text>
+            {prefill.questions.length > 0
+              ? <>{prefill.questions.map((q, i) => <Text key={i} style={{ fontSize: FONT.body, fontWeight: "600", color: t.fg }}>• {questionText(q)}</Text>)}</>
+              : <Text style={{ fontSize: FONT.body, fontWeight: "600", color: t.paid }}>Sab mil gaya. Dekh kar confirm kijiye.</Text>}
+          </View>
+        )}
 
         {!review ? (<>
           <Section title="Party">
@@ -221,7 +256,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
             {touched && draft && draft.errors.length > 0 && (
               <View style={{ gap: 2 }}>{draft.errors.map((e) => <Text key={e} style={{ color: t.due, fontSize: FONT.small }}>• {e}</Text>)}</View>
             )}
-            <Row wrap={false}><Btn label="Dekho aur save karo ›" disabled={!draft?.payload || needReason} onPress={() => setReview(true)} /></Row>
+            <Row wrap={false}><Btn label="Dekho aur save karo ›" disabled={!draft?.payload || needReason} onPress={() => setReview(true)} />{onSkip && <Btn kind="ghost" label="Chhodo" onPress={onSkip} />}</Row>
           </>)}
         </>) : (
           // ───────── Review: read-back before saving (FR-25, FR-40) ─────────

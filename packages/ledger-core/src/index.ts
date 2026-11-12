@@ -6,3 +6,5 @@ export * from "./ledger";
 export * from "./allocation";
 export * from "./materials";
 export * from "./entryDraft";
+export * from "./spoken";
+export * from "./understand";

@@ -7,14 +7,18 @@ import { AddEntry } from "./src/AddEntry";
 import { EntryDetail } from "./src/EntryDetail";
 import { Ledger } from "./src/Ledger";
 import { Login } from "./src/Login";
+import { Voice } from "./src/Voice";
+import type { ResolvedEntry } from "@munim/ledger-core";
 import { PartyList } from "./src/PartyList";
 import { loadParties, type PartyRow } from "./src/data";
 import { supabase } from "./src/supabase";
 import { useTheme } from "./src/theme";
 
+type PartyRef2 = PartyRow;
 type Screen =
   | { name: "parties" }
   | { name: "ledger"; party: PartyRow }
+  | { name: "voice" }
   | { name: "add"; party?: PartyRow; editingId?: string }
   | { name: "detail"; party: PartyRow; entryId: string };
 
@@ -25,6 +29,7 @@ export default function App() {
   const [data, setData] = useState<{ businessId: string; business: string; parties: PartyRow[] } | null>(null);
   const [err, setErr] = useState("");
   const [rev, setRev] = useState(0); // bump to force the ledger to reload
+  const [queue, setQueue] = useState<{ items: ResolvedEntry[]; i: number; text: string } | null>(null);
 
   const refresh = useCallback(async () => {
     try { setData(await loadParties()); setErr(""); } catch (e: any) { setErr(e.message ?? String(e)); }
@@ -36,14 +41,25 @@ export default function App() {
   }, []);
   useEffect(() => { if (session) refresh(); }, [session, refresh]);
 
+  // After a voice entry is saved or skipped: go to the next entry from the same sentence, else back to the ledger.
+  const nextInQueue = async (p: PartyRef2 | undefined) => {
+    await refresh(); setRev((n) => n + 1);
+    if (queue && queue.i + 1 < queue.items.length) { setQueue({ ...queue, i: queue.i + 1 }); setScreen({ name: "add", party: undefined }); return; }
+    setQueue(null);
+    setScreen(p ? { name: "ledger", party: p } : { name: "parties" });
+  };
   const fresh = (p: PartyRow | undefined) => (p && data ? data.parties.find((x) => x.id === p.id) ?? p : p);
   let body;
   if (session === undefined) body = <View style={{ flex: 1, justifyContent: "center" }}><ActivityIndicator /></View>;
   else if (!session) body = <Login />;
+  else if (screen.name === "voice")
+    body = <Voice onCancel={() => setScreen({ name: "parties" })} onResolved={(items, text) => { setQueue({ items, i: 0, text }); setScreen({ name: "add" }); }} />;
   else if (screen.name === "add" && data)
-    body = <AddEntry businessId={data.businessId} parties={data.parties} initialParty={fresh(screen.party)} editingId={screen.editingId}
-      onCancel={() => setScreen(screen.party ? (screen.editingId ? { name: "detail", party: screen.party, entryId: screen.editingId } : { name: "ledger", party: screen.party }) : { name: "parties" })}
-      onDone={async (p) => { await refresh(); setRev((n) => n + 1); setScreen(p ? { name: "ledger", party: p } : { name: "parties" }); }} />;
+    body = <AddEntry key={queue ? `q${queue.i}` : "plain"} businessId={data.businessId} parties={data.parties} initialParty={fresh(screen.party)} editingId={screen.editingId}
+      prefill={queue?.items[queue.i]} transcript={queue?.text} queueLabel={queue && queue.items.length > 1 ? `Entry ${queue.i + 1}/${queue.items.length}` : undefined}
+      onSkip={queue ? () => nextInQueue(undefined) : undefined}
+      onCancel={() => { setQueue(null);  setScreen(screen.party ? (screen.editingId ? { name: "detail", party: screen.party, entryId: screen.editingId } : { name: "ledger", party: screen.party }) : { name: "parties" }); }}
+      onDone={(p) => nextInQueue(p)} />;
   else if (screen.name === "detail")
     body = <EntryDetail entryId={screen.entryId} party={screen.party} onBack={() => setScreen({ name: "ledger", party: screen.party })}
       onEdit={() => setScreen({ name: "add", party: screen.party, editingId: screen.entryId })}
@@ -51,7 +67,7 @@ export default function App() {
   else if (screen.name === "ledger") {
     const p = fresh(screen.party)!;
     body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} />;
-  } else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} />;
+  } else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onVoice={() => setScreen({ name: "voice" })} />;
 
   return (
     <SafeAreaProvider>

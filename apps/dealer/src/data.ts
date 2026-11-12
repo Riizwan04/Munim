@@ -1,4 +1,4 @@
-import { partyBalance, entryEffect, type Entry, type EntryPayload, type MaterialRef } from "@munim/ledger-core";
+import { partyBalance, entryEffect, type Entry, type EntryPayload, type MaterialRef, type PartyRef } from "@munim/ledger-core";
 import { supabase } from "./supabase";
 
 export interface PartyRow { id: string; name: string; phone: string; opening: number; balance: number; creditLimit: number | null }
@@ -111,3 +111,18 @@ export const createParty = async (businessId: string, name: string, phone: strin
   must(await supabase.from("parties").insert({ business_id: businessId, name, phone }).select("id").single()).id as string;
 export const createSite = async (businessId: string, partyId: string, name: string) =>
   must(await supabase.from("sites").insert({ business_id: businessId, party_id: partyId, name }).select("id").single()).id as string;
+
+export async function loadUnderstandContext(): Promise<{ parties: PartyRef[]; materials: MaterialRef[] }> {
+  const [p, s, materials] = await Promise.all([
+    supabase.from("parties").select("id,name,nicknames"),
+    supabase.from("sites").select("id,name,party_id"),
+    loadMaterials(),
+  ]);
+  if (p.error) throw p.error;
+  if (s.error) throw s.error;
+  const parties: PartyRef[] = (p.data ?? []).map((x) => ({
+    id: x.id, name: x.name, nicknames: x.nicknames ?? [],
+    sites: (s.data ?? []).filter((y) => y.party_id === x.id).map((y) => ({ id: y.id, name: y.name })),
+  }));
+  return { parties, materials };
+}
