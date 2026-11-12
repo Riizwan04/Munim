@@ -129,3 +129,13 @@ td{padding:7px 6px;border-bottom:1px solid #e6e9e1}.n{text-align:right;font-vari
 <tr><td></td><td><b>${t.opening}</b></td><td></td><td class="n"><b>${formatINR(s.opening)}</b></td></tr>${rows}
 <tr class="tot"><td></td><td>${s.siteName ? t.site_bal : t.closing}</td><td></td><td class="n">${formatINR(s.closing)}</td></tr></tbody></table></body></html>`;
 }
+
+/** Polite payment reminder text (PRD §10). UPI pay link / statement link will be added when those exist. */
+export function reminderMessage(a: { lang: Lang; businessName: string; partyName: string; balance: Paise; overdueDays?: number | null }): string {
+  const bal = formatINR(a.balance);
+  const d = a.overdueDays && a.overdueDays > 0 ? a.overdueDays : null;
+  const name = `${a.partyName} ji`;
+  if (a.lang === "mr") return `Namaskar ${name},\nTumcha ${bal} baaki aahe${d ? ` (sarvat juni entry ${d} divas)` : ""}. Kripaya lavkar bhugtan kara.\nDhanyavaad!\n— ${a.businessName}`;
+  if (a.lang === "en") return `Hello ${name},\nYour balance of ${bal} is due${d ? ` (oldest entry ${d} days)` : ""}. Kindly pay at your earliest convenience.\nThank you!\n— ${a.businessName}`;
+  return `Namaste ${name},\nAapka ${bal} baaki hai${d ? ` (sabse purani entry ${d} din)` : ""}. Kripya jaldi bhugtan karein.\nDhanyavaad!\n— ${a.businessName}`;
+}

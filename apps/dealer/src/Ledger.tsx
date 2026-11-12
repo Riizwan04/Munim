@@ -8,7 +8,7 @@ import { FONT, useTheme } from "./theme";
 // Fits a phone with no sideways scroll: Item takes the leftover width; the site shows as a small line under the item.
 const W = { date: 64, qty: 86, rate: 60, amt: 90 };
 
-export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void; onEditParty: () => void; onStatement: () => void }) {
+export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement, onRemind }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void; onEditParty: () => void; onStatement: () => void; onRemind: () => void }) {
   const t = useTheme();
   const [rows, setRows] = useState<LedgerRow[] | null>(null);
   const [err, setErr] = useState("");
@@ -23,6 +23,11 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement 
           <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ Parties</Text>
         </Pressable>
         <View style={{ flexDirection: "row", gap: 6, margin: 8 }}>
+          {party.balance > 0 && (
+            <Pressable onPress={onRemind} accessibilityRole="button" style={{ paddingHorizontal: 12, minHeight: 48, justifyContent: "center", borderRadius: 24, borderWidth: 2, borderColor: t.due }}>
+              <Text style={{ fontSize: FONT.small + 1, color: t.due, fontWeight: "700" }}>Yaad dilao</Text>
+            </Pressable>
+          )}
           <Pressable onPress={onStatement} accessibilityRole="button" style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: "center", borderRadius: 24, borderWidth: 2, borderColor: t.accent }}>
             <Text style={{ fontSize: FONT.small + 1, color: t.accent, fontWeight: "700" }}>Hisaab bhejo</Text>
           </Pressable>

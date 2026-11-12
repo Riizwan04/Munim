@@ -180,3 +180,17 @@ export async function loadStatementData(partyId: string): Promise<StatementData>
     sites: s.data ?? [],
   };
 }
+
+// ───────── manual reminders (log only; nothing is sent or scheduled by the app) ─────────
+/** Latest reminder time per party, so the list can show "last reminded". Returns {} if the table is not set up yet. */
+export async function loadReminderLog(): Promise<Record<string, string>> {
+  const r = await supabase.from("reminders").select("party_id,created_at").order("created_at", { ascending: false });
+  if (r.error) return {};
+  const out: Record<string, string> = {};
+  for (const row of r.data ?? []) if (!out[row.party_id]) out[row.party_id] = row.created_at;
+  return out;
+}
+export async function logReminder(businessId: string, partyId: string, amount: number, message: string): Promise<void> {
+  const r = await supabase.from("reminders").insert({ business_id: businessId, party_id: partyId, amount, message, channel: "whatsapp" });
+  if (r.error) throw new Error(r.error.message);
+}

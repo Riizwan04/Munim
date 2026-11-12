@@ -9,7 +9,8 @@
   "scripts": {
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "seed": "NODE_USE_ENV_PROXY=1 NODE_NO_WARNINGS=1 tsx scripts/seed-demo.ts"
+    "seed": "NODE_USE_ENV_PROXY=1 NODE_NO_WARNINGS=1 tsx scripts/seed-demo.ts",
+    "build:web": "npm run build:web -w @munim/dealer"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.119.0",

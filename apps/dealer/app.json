@@ -5,8 +5,21 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "ios": { "supportsTablet": false, "bundleIdentifier": "app.munim.dealer" },
-    "android": { "package": "app.munim.dealer" },
-    "web": { "bundler": "metro" }
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.munim.dealer"
+    },
+    "android": {
+      "package": "app.munim.dealer"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "Munim",
+      "shortName": "Munim",
+      "themeColor": "#1f3a8a",
+      "backgroundColor": "#f6f7f4",
+      "description": "Voice-first ledger for small businesses"
+    }
   }
 }

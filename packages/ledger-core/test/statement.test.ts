@@ -76,3 +76,17 @@ describe("entry messages (PRD §10)", () => {
     expect(f("en")).toContain("(UPI) received. Thank you!");
   });
 });
+
+import { reminderMessage } from "../src/index";
+describe("reminder message", () => {
+  const a = { businessName: "Shop", partyName: "Suresh", balance: R(103300), overdueDays: 35 };
+  it("hindi / marathi / english", () => {
+    expect(reminderMessage({ ...a, lang: "hi" })).toBe("Namaste Suresh ji,\nAapka ₹1,03,300 baaki hai (sabse purani entry 35 din). Kripya jaldi bhugtan karein.\nDhanyavaad!\n— Shop");
+    expect(reminderMessage({ ...a, lang: "mr" })).toContain("Tumcha ₹1,03,300 baaki aahe (sarvat juni entry 35 divas)");
+    expect(reminderMessage({ ...a, lang: "en" })).toContain("Your balance of ₹1,03,300 is due (oldest entry 35 days)");
+  });
+  it("leaves out the age when unknown or zero", () => {
+    expect(reminderMessage({ ...a, lang: "hi", overdueDays: null })).not.toContain("purani");
+    expect(reminderMessage({ ...a, lang: "hi", overdueDays: 0 })).not.toContain("purani");
+  });
+});
