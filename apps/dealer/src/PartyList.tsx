@@ -1,36 +1,69 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
-import type { PartyRow } from "./data";
+import type { Overview, PartyRow } from "./data";
 import { rupee } from "./money";
 import { supabase } from "./supabase";
 import { FONT, useTheme } from "./theme";
 
-export function PartyList({ data, err, onOpen, onAdd, onVoice, onRefresh }: { data: { business: string; parties: PartyRow[] } | null; err: string; onOpen: (p: PartyRow) => void; onAdd: () => void; onVoice: () => void; onRefresh: () => Promise<void> }) {
+type Sort = "balance" | "overdue";
+
+/** Home: receivable, today's sales & collections, overdue count (FR-70) and the party list sorted by balance or days overdue (FR-71). */
+export function PartyList({ data, err, onOpen, onAdd, onVoice, onRefresh }: {
+  data: Overview | null; err: string; onOpen: (p: PartyRow) => void; onAdd: () => void; onVoice: () => void; onRefresh: () => Promise<void>;
+}) {
   const t = useTheme();
-  const state = data;
   const [refreshing, setRefreshing] = useState(false);
+  const [sort, setSort] = useState<Sort>("balance");
+  const [q, setQ] = useState("");
+  const list = useMemo(() => {
+    if (!data) return [];
+    const s = q.trim().toLowerCase();
+    const rows = data.parties.filter((p) => !s || p.name.toLowerCase().includes(s) || p.nicknames.some((n) => n.toLowerCase().includes(s)));
+    return [...rows].sort(sort === "balance" ? (a, b) => b.balance - a.balance : (a, b) => (b.overdueDays ?? -1) - (a.overdueDays ?? -1));
+  }, [data, sort, q]);
   if (err) return <Text style={{ color: t.due, padding: 24, fontSize: FONT.body }}>{err}</Text>;
-  if (!state) return <ActivityIndicator style={{ flex: 1 }} />;
-  const total = state.parties.reduce((s, p) => s + p.balance, 0);
+  if (!data) return <ActivityIndicator style={{ flex: 1 }} />;
+  const total = data.parties.reduce((s, p) => s + Math.max(p.balance, 0), 0);
+  const overdue = data.parties.filter((p) => (p.overdueDays ?? 0) > 30 && p.balance > 0).length;
+  const stat = (label: string, value: string, color: string) => (
+    <View style={{ flex: 1, minWidth: 100, gap: 2 }}>
+      <Text style={{ fontSize: 13, color: t.muted }}>{label}</Text>
+      <Text style={{ fontSize: FONT.body + 2, fontWeight: "700", color }}>{value}</Text>
+    </View>
+  );
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={{ padding: 16, borderBottomWidth: 2, borderColor: t.ink, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
-        <View style={{ flexShrink: 1 }}>
-          <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{state.business}</Text>
+      <View style={{ padding: 16, gap: 12, borderBottomWidth: 2, borderColor: t.ink }}>
+        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{data.business}</Text>
+        <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           <Text style={{ fontSize: FONT.small, color: t.muted }}>Kul baaki (total receivable)</Text>
+          <Text style={{ fontSize: FONT.big, fontWeight: "700", color: t.due }}>{rupee(total)}</Text>
         </View>
-        <Text style={{ fontSize: FONT.big, fontWeight: "700", color: t.due, marginLeft: 8 }}>{rupee(total)}</Text>
+        <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
+          {stat("Aaj ki bikri", rupee(data.todaySales), t.fg)}
+          {stat("Aaj mila", rupee(data.todayCollections), t.paid)}
+          {stat("30 din se purana", `${overdue} party`, overdue ? t.due : t.fg)}
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", gap: 8, padding: 10, alignItems: "center" }}>
+        {(["balance", "overdue"] as Sort[]).map((k) => (
+          <Pressable key={k} onPress={() => setSort(k)} accessibilityRole="button" style={{ minHeight: 44, paddingHorizontal: 14, justifyContent: "center", borderRadius: 22, borderWidth: 2, borderColor: sort === k ? t.accent : t.line, backgroundColor: sort === k ? t.accent : t.surface }}>
+            <Text style={{ fontSize: FONT.small, fontWeight: "600", color: sort === k ? t.accentFg : t.fg }}>{k === "balance" ? "Baaki ke hisab se" : "Purane pehle"}</Text>
+          </Pressable>
+        ))}
       </View>
       <FlatList
-        data={state.parties}
+        data={list}
         keyExtractor={(p) => p.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await onRefresh(); setRefreshing(false); }} />}
-        ListEmptyComponent={<Text style={{ padding: 24, fontSize: FONT.body, color: t.muted }}>No parties yet.</Text>}
+        ListEmptyComponent={<Text style={{ padding: 24, fontSize: FONT.body, color: t.muted }}>Abhi koi party nahi. "+ Entry" se nayi party jodiye.</Text>}
         renderItem={({ item }) => (
           <Pressable onPress={() => onOpen(item)} accessibilityRole="button" style={{ padding: 16, minHeight: 64, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderColor: t.rule, backgroundColor: t.surface }}>
             <View style={{ flexShrink: 1 }}>
               <Text style={{ fontSize: FONT.body + 2, fontWeight: "600", color: t.fg }}>{item.name}</Text>
-              <Text style={{ fontSize: FONT.small, color: t.muted }}>{item.phone}</Text>
+              <Text style={{ fontSize: FONT.small, color: (item.overdueDays ?? 0) > 30 ? t.due : t.muted }}>
+                {item.balance > 0 && item.overdueDays !== null ? `${item.overdueDays} din se baaki` : item.phone}
+              </Text>
             </View>
             <Text style={{ fontSize: FONT.title, fontWeight: "700", color: item.balance > 0 ? t.due : t.paid }}>{rupee(item.balance)}</Text>
           </Pressable>

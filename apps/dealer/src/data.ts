@@ -1,7 +1,12 @@
-import { partyBalance, entryEffect, type Entry, type EntryPayload, type MaterialRef, type PartyRef } from "@munim/ledger-core";
+import { partyStats, getPreset, partyBalance, entryEffect, type Entry, type EntryPayload, type MaterialRef, type PartyRef } from "@munim/ledger-core";
+import { localToday } from "./dates";
 import { supabase } from "./supabase";
 
-export interface PartyRow { id: string; name: string; phone: string; opening: number; balance: number; creditLimit: number | null }
+export interface PartyRow {
+  id: string; name: string; phone: string; opening: number; balance: number; creditLimit: number | null;
+  nicknames: string[]; language: string; overdueDays: number | null;
+}
+export interface Overview { businessId: string; business: string; parties: PartyRow[]; todaySales: number; todayCollections: number }
 export interface LedgerRow {
   key: string; entryId?: string; kind: "balance" | "line" | "payment" | "charge" | "total";
   date?: string; item: string; qty?: string; rate?: number; amount: number; site?: string;
@@ -14,22 +19,28 @@ const toEntry = (r: any): Entry => ({
   lines: (r.entry_lines ?? []).map((l: any) => ({ materialId: l.material_id, quantity: Number(l.quantity), unit: l.unit, rate: Number(l.rate), gstBp: l.gst_bp ?? undefined })),
 });
 
-export async function loadParties(): Promise<{ businessId: string; business: string; parties: PartyRow[] }> {
+export async function loadParties(): Promise<Overview> {
   const [b, p, e] = await Promise.all([
     supabase.from("businesses").select("id,name").limit(1).maybeSingle(),
-    supabase.from("parties").select("id,name,phone,opening_balance,credit_limit"),
+    supabase.from("parties").select("id,name,phone,opening_balance,credit_limit,nicknames,preferred_language"),
     supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,entry_lines(material_id,quantity,unit,rate,gst_bp)"),
   ]);
   if (p.error) throw p.error;
   if (e.error) throw e.error;
   const byParty = new Map<string, Entry[]>();
   for (const r of e.data ?? []) (byParty.get(r.party_id) ?? byParty.set(r.party_id, []).get(r.party_id)!).push(toEntry(r));
-  const parties = (p.data ?? []).map((x) => ({
-    id: x.id, name: x.name, phone: x.phone, opening: Number(x.opening_balance),
-    balance: partyBalance(Number(x.opening_balance), byParty.get(x.id) ?? []),
-    creditLimit: x.credit_limit === null ? null : Number(x.credit_limit),
-  })).sort((a, b) => b.balance - a.balance);
-  return { businessId: b.data?.id ?? "", business: b.data?.name ?? "Munim", parties };
+  const today = localToday();
+  let todaySales = 0, todayCollections = 0;
+  const parties: PartyRow[] = (p.data ?? []).map((x) => {
+    const st = partyStats(Number(x.opening_balance), byParty.get(x.id) ?? [], today);
+    todaySales += st.todaySales; todayCollections += st.todayCollections;
+    return {
+      id: x.id, name: x.name, phone: x.phone, opening: Number(x.opening_balance), balance: st.balance,
+      creditLimit: x.credit_limit === null ? null : Number(x.credit_limit),
+      nicknames: x.nicknames ?? [], language: x.preferred_language ?? "hi", overdueDays: st.overdueDays,
+    };
+  }).sort((a, b) => b.balance - a.balance);
+  return { businessId: b.data?.id ?? "", business: b.data?.name ?? "Munim", parties, todaySales, todayCollections };
 }
 
 const MODE: Record<string, string> = { cash: "Cash", upi: "Online (UPI)", cheque: "Cheque", bank: "Bank transfer" };
@@ -126,3 +137,27 @@ export async function loadUnderstandContext(): Promise<{ parties: PartyRef[]; ma
   }));
   return { parties, materials };
 }
+
+// ───────── setup & masters ─────────
+export async function createBusinessWithPreset(name: string, phone: string, presetKey: string): Promise<void> {
+  const id = must(await supabase.rpc("create_business", { p_name: name, p_phone: phone, p_language: "hi", p_type: presetKey })) as string;
+  const items = getPreset(presetKey)?.items ?? [];
+  if (items.length) {
+    must(await supabase.from("materials").insert(items.map((i) => ({ business_id: id, name: i.name, category: i.category, units: i.units, local_names: i.localNames ?? [] }))).select("id"));
+  }
+}
+
+export interface MaterialFull { id: string; name: string; category: string | null; units: string[]; localNames: string[] }
+export async function loadMaterialsFull(): Promise<MaterialFull[]> {
+  const r = await supabase.from("materials").select("id,name,category,local_names,units").order("category").order("name");
+  if (r.error) throw r.error;
+  return (r.data ?? []).map((m) => ({ id: m.id, name: m.name, category: m.category, units: m.units, localNames: m.local_names ?? [] }));
+}
+export const saveMaterial = async (businessId: string, m: { id?: string; name: string; category: string; units: string[]; localNames: string[] }) => {
+  const row = { name: m.name, category: m.category || null, units: m.units, local_names: m.localNames };
+  if (m.id) must(await supabase.from("materials").update(row).eq("id", m.id).select("id"));
+  else must(await supabase.from("materials").insert({ ...row, business_id: businessId }).select("id"));
+};
+export const updateParty = async (id: string, v: { name: string; phone: string; nicknames: string[]; creditLimit: number | null; opening: number; language: string }) => {
+  must(await supabase.from("parties").update({ name: v.name, phone: v.phone, nicknames: v.nicknames, credit_limit: v.creditLimit, opening_balance: v.opening, preferred_language: v.language }).eq("id", id).select("id"));
+};

@@ -5,6 +5,7 @@ import {
   type DraftLine, type Entry, type EntryType, type MaterialRef, type PaymentMode, type Question, type ResolvedEntry,
 } from "@munim/ledger-core";
 import { createParty, createSite, editEntry, loadEntry, loadMaterials, loadPartyContext, saveEntry, type PartyRow } from "./data";
+import { localToday } from "./dates";
 import { rupee } from "./money";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
@@ -16,7 +17,7 @@ const TYPES: { k: EntryType; label: string }[] = [
 const MODES: { k: PaymentMode; label: string }[] = [
   { k: "cash", label: "Cash" }, { k: "upi", label: "Online (UPI)" }, { k: "cheque", label: "Cheque" }, { k: "bank", label: "Bank" },
 ];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = localToday;
 const blank = (): DraftLine => ({ qty: "", rate: "" });
 
 export function questionText(q: Question): string {
@@ -162,7 +163,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
                 <Row><Btn label="Party banao" disabled={!newParty.name.trim() || newParty.phone.trim().length < 8} onPress={async () => {
                   try {
                     const id = await createParty(businessId, newParty.name.trim(), newParty.phone.trim());
-                    const p: PartyRow = { id, name: newParty.name.trim(), phone: newParty.phone.trim(), opening: 0, balance: 0, creditLimit: null };
+                    const p: PartyRow = { id, name: newParty.name.trim(), phone: newParty.phone.trim(), opening: 0, balance: 0, creditLimit: null, nicknames: [], language: "hi", overdueDays: null };
                     setPartyList([...partyList, p]); setParty(p); setNewParty(null);
                   } catch (e: any) { setErr(e.message); }
                 }} /><Btn kind="ghost" label="Rehne do" onPress={() => setNewParty(null)} /></Row>

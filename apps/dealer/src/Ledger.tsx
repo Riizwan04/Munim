@@ -8,7 +8,7 @@ import { FONT, useTheme } from "./theme";
 // Fits a phone with no sideways scroll: Item takes the leftover width; the site shows as a small line under the item.
 const W = { date: 64, qty: 86, rate: 60, amt: 90 };
 
-export function Ledger({ party, onBack, onAdd, onOpen }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void }) {
+export function Ledger({ party, onBack, onAdd, onOpen, onEditParty }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void; onEditParty: () => void }) {
   const t = useTheme();
   const [rows, setRows] = useState<LedgerRow[] | null>(null);
   const [err, setErr] = useState("");
@@ -27,7 +27,10 @@ export function Ledger({ party, onBack, onAdd, onOpen }: { party: PartyRow; onBa
         </Pressable>
       </View>
       <View style={{ paddingHorizontal: 16, paddingBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 2, borderColor: t.ink }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink, flexShrink: 1 }}>{party.name}</Text>
+        <Pressable onPress={onEditParty} accessibilityRole="button" style={{ flexShrink: 1 }}>
+          <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{party.name}</Text>
+          <Text style={{ fontSize: 13, color: t.accent }}>Jaankari badlo ›</Text>
+        </Pressable>
         <View style={{ alignItems: "flex-end" }}>
           <Text style={{ fontSize: 14, color: t.muted }}>Kul baaki</Text>
           <Text style={{ fontSize: FONT.big, fontWeight: "700", color: t.due }}>{rupee(total)}</Text>

@@ -8,9 +8,14 @@ import { EntryDetail } from "./src/EntryDetail";
 import { Ledger } from "./src/Ledger";
 import { Login } from "./src/Login";
 import { Voice } from "./src/Voice";
+import { Onboarding } from "./src/Onboarding";
+import { Items } from "./src/Items";
+import { PartyEdit } from "./src/PartyEdit";
+import { Pressable, Text } from "react-native";
+import { FONT } from "./src/theme";
 import type { ResolvedEntry } from "@munim/ledger-core";
 import { PartyList } from "./src/PartyList";
-import { loadParties, type PartyRow } from "./src/data";
+import { loadParties, type Overview, type PartyRow } from "./src/data";
 import { supabase } from "./src/supabase";
 import { useTheme } from "./src/theme";
 
@@ -19,6 +24,8 @@ type Screen =
   | { name: "parties" }
   | { name: "ledger"; party: PartyRow }
   | { name: "voice" }
+  | { name: "items" }
+  | { name: "partyEdit"; party: PartyRow }
   | { name: "add"; party?: PartyRow; editingId?: string }
   | { name: "detail"; party: PartyRow; entryId: string };
 
@@ -26,7 +33,7 @@ export default function App() {
   const t = useTheme();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [screen, setScreen] = useState<Screen>({ name: "parties" });
-  const [data, setData] = useState<{ businessId: string; business: string; parties: PartyRow[] } | null>(null);
+  const [data, setData] = useState<Overview | null>(null);
   const [err, setErr] = useState("");
   const [rev, setRev] = useState(0); // bump to force the ledger to reload
   const [queue, setQueue] = useState<{ items: ResolvedEntry[]; i: number; text: string } | null>(null);
@@ -52,6 +59,9 @@ export default function App() {
   let body;
   if (session === undefined) body = <View style={{ flex: 1, justifyContent: "center" }}><ActivityIndicator /></View>;
   else if (!session) body = <Login />;
+  else if (data && !data.businessId) body = <Onboarding onDone={refresh} />;
+  else if (screen.name === "partyEdit")
+    body = <PartyEdit party={fresh(screen.party)!} onBack={() => setScreen({ name: "ledger", party: screen.party })} onSaved={async () => { await refresh(); setRev((n) => n + 1); setScreen({ name: "ledger", party: screen.party }); }} />;
   else if (screen.name === "voice")
     body = <Voice onCancel={() => setScreen({ name: "parties" })} onResolved={(items, text) => { setQueue({ items, i: 0, text }); setScreen({ name: "add" }); }} />;
   else if (screen.name === "add" && data)
@@ -66,14 +76,24 @@ export default function App() {
       onChanged={async () => { await refresh(); setRev((n) => n + 1); setScreen({ name: "ledger", party: screen.party }); }} />;
   else if (screen.name === "ledger") {
     const p = fresh(screen.party)!;
-    body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} />;
-  } else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onVoice={() => setScreen({ name: "voice" })} />;
+    body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} onEditParty={() => setScreen({ name: "partyEdit", party: p })} />;
+  } else if (screen.name === "items" && data) body = <Items businessId={data.businessId} />;
+  else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onVoice={() => setScreen({ name: "voice" })} />;
 
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
         <StatusBar style="auto" />
-        {body}
+        <View style={{ flex: 1 }}>{body}</View>
+        {session && data?.businessId && (screen.name === "parties" || screen.name === "items") ? (
+          <View style={{ flexDirection: "row", borderTopWidth: 1, borderColor: t.line, backgroundColor: t.surface }}>
+            {([["parties", "Parties"], ["items", "Maal (Items)"]] as const).map(([k, label]) => (
+              <Pressable key={k} onPress={() => setScreen(k === "items" ? { name: "items" } : { name: "parties" })} accessibilityRole="tab" style={{ flex: 1, minHeight: 56, alignItems: "center", justifyContent: "center", borderTopWidth: 3, borderColor: screen.name === k ? t.accent : "transparent" }}>
+                <Text style={{ fontSize: FONT.body, fontWeight: "700", color: screen.name === k ? t.accent : t.muted }}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </SafeAreaView>
     </SafeAreaProvider>
   );
