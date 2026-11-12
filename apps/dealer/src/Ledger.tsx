@@ -8,7 +8,7 @@ import { FONT, useTheme } from "./theme";
 // Fits a phone with no sideways scroll: Item takes the leftover width; the site shows as a small line under the item.
 const W = { date: 64, qty: 86, rate: 60, amt: 90 };
 
-export function Ledger({ party, onBack }: { party: PartyRow; onBack: () => void }) {
+export function Ledger({ party, onBack, onAdd, onOpen }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void }) {
   const t = useTheme();
   const [rows, setRows] = useState<LedgerRow[] | null>(null);
   const [err, setErr] = useState("");
@@ -18,9 +18,14 @@ export function Ledger({ party, onBack }: { party: PartyRow; onBack: () => void 
   const txt = (color: string, bold = false, size: number = FONT.body) => ({ color, fontSize: size, fontWeight: bold ? ("700" as const) : ("400" as const), fontVariant: ["tabular-nums" as const] });
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <Pressable onPress={onBack} accessibilityRole="button" style={{ padding: 14, minHeight: 52, justifyContent: "center" }}>
-        <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ Parties</Text>
-      </Pressable>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Pressable onPress={onBack} accessibilityRole="button" style={{ padding: 14, minHeight: 52, justifyContent: "center" }}>
+          <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ Parties</Text>
+        </Pressable>
+        <Pressable onPress={onAdd} accessibilityRole="button" style={{ margin: 8, paddingHorizontal: 18, minHeight: 48, justifyContent: "center", borderRadius: 24, backgroundColor: t.paid }}>
+          <Text style={{ fontSize: FONT.body, color: "#fff", fontWeight: "700" }}>+ Nayi entry</Text>
+        </Pressable>
+      </View>
       <View style={{ paddingHorizontal: 16, paddingBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 2, borderColor: t.ink }}>
         <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink, flexShrink: 1 }}>{party.name}</Text>
         <View style={{ alignItems: "flex-end" }}>
@@ -44,7 +49,7 @@ export function Ledger({ party, onBack }: { party: PartyRow; onBack: () => void 
               const color = isPay ? t.paid : isBal ? t.fg : t.ink;
               const fs = 15;
               return (
-                <View key={r.key} style={{ flexDirection: "row", borderBottomWidth: r.kind === "total" ? 0 : 1, borderTopWidth: r.kind === "total" ? 2 : 0, borderColor: r.kind === "total" ? t.ink : t.rule, backgroundColor: isPay ? t.paidBg : isBal ? t.bg : t.surface }}>
+                <Pressable key={r.key} disabled={!r.entryId} onPress={() => r.entryId && onOpen(r.entryId)} style={{ flexDirection: "row", borderBottomWidth: r.kind === "total" ? 0 : 1, borderTopWidth: r.kind === "total" ? 2 : 0, borderColor: r.kind === "total" ? t.ink : t.rule, backgroundColor: isPay ? t.paidBg : isBal ? t.bg : t.surface }}>
                   <View style={cell(W.date)}><Text numberOfLines={1} style={txt(t.muted, false, fs)}>{r.date ?? ""}</Text></View>
                   <View style={cell(undefined)}>
                     <Text style={txt(color, isBal || isPay, fs + 1)}>{r.item}</Text>
@@ -53,7 +58,7 @@ export function Ledger({ party, onBack }: { party: PartyRow; onBack: () => void 
                   <View style={cell(W.qty, true)}><Text numberOfLines={1} style={txt(color, false, fs)}>{r.qty ?? ""}</Text></View>
                   <View style={cell(W.rate, true)}><Text numberOfLines={1} style={txt(color, false, fs)}>{r.rate !== undefined ? rs(r.rate) : ""}</Text></View>
                   <View style={cell(W.amt, true)}><Text numberOfLines={1} style={txt(r.kind === "total" ? t.due : color, isBal || isPay, fs + 1)}>{isPay ? "− " : ""}{rs(Math.abs(r.amount))}</Text></View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
