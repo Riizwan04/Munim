@@ -8,6 +8,7 @@ import { EntryDetail } from "./src/EntryDetail";
 import { Ledger } from "./src/Ledger";
 import { Login } from "./src/Login";
 import { Voice } from "./src/Voice";
+import { Statement } from "./src/Statement";
 import { Onboarding } from "./src/Onboarding";
 import { Items } from "./src/Items";
 import { PartyEdit } from "./src/PartyEdit";
@@ -25,6 +26,7 @@ type Screen =
   | { name: "ledger"; party: PartyRow }
   | { name: "voice" }
   | { name: "items" }
+  | { name: "statement"; party: PartyRow }
   | { name: "partyEdit"; party: PartyRow }
   | { name: "add"; party?: PartyRow; editingId?: string }
   | { name: "detail"; party: PartyRow; entryId: string };
@@ -60,6 +62,8 @@ export default function App() {
   if (session === undefined) body = <View style={{ flex: 1, justifyContent: "center" }}><ActivityIndicator /></View>;
   else if (!session) body = <Login />;
   else if (data && !data.businessId) body = <Onboarding onDone={refresh} />;
+  else if (screen.name === "statement")
+    body = <Statement party={fresh(screen.party)!} onBack={() => setScreen({ name: "ledger", party: screen.party })} />;
   else if (screen.name === "partyEdit")
     body = <PartyEdit party={fresh(screen.party)!} onBack={() => setScreen({ name: "ledger", party: screen.party })} onSaved={async () => { await refresh(); setRev((n) => n + 1); setScreen({ name: "ledger", party: screen.party }); }} />;
   else if (screen.name === "voice")
@@ -76,7 +80,7 @@ export default function App() {
       onChanged={async () => { await refresh(); setRev((n) => n + 1); setScreen({ name: "ledger", party: screen.party }); }} />;
   else if (screen.name === "ledger") {
     const p = fresh(screen.party)!;
-    body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} onEditParty={() => setScreen({ name: "partyEdit", party: p })} />;
+    body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} onEditParty={() => setScreen({ name: "partyEdit", party: p })} onStatement={() => setScreen({ name: "statement", party: p })} />;
   } else if (screen.name === "items" && data) body = <Items businessId={data.businessId} />;
   else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onVoice={() => setScreen({ name: "voice" })} />;
 

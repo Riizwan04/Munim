@@ -8,7 +8,7 @@ import { FONT, useTheme } from "./theme";
 // Fits a phone with no sideways scroll: Item takes the leftover width; the site shows as a small line under the item.
 const W = { date: 64, qty: 86, rate: 60, amt: 90 };
 
-export function Ledger({ party, onBack, onAdd, onOpen, onEditParty }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void; onEditParty: () => void }) {
+export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void; onEditParty: () => void; onStatement: () => void }) {
   const t = useTheme();
   const [rows, setRows] = useState<LedgerRow[] | null>(null);
   const [err, setErr] = useState("");
@@ -22,9 +22,14 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty }: { party: P
         <Pressable onPress={onBack} accessibilityRole="button" style={{ padding: 14, minHeight: 52, justifyContent: "center" }}>
           <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ Parties</Text>
         </Pressable>
-        <Pressable onPress={onAdd} accessibilityRole="button" style={{ margin: 8, paddingHorizontal: 18, minHeight: 48, justifyContent: "center", borderRadius: 24, backgroundColor: t.paid }}>
-          <Text style={{ fontSize: FONT.body, color: "#fff", fontWeight: "700" }}>+ Nayi entry</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 6, margin: 8 }}>
+          <Pressable onPress={onStatement} accessibilityRole="button" style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: "center", borderRadius: 24, borderWidth: 2, borderColor: t.accent }}>
+            <Text style={{ fontSize: FONT.small + 1, color: t.accent, fontWeight: "700" }}>Hisaab bhejo</Text>
+          </Pressable>
+          <Pressable onPress={onAdd} accessibilityRole="button" style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: "center", borderRadius: 24, backgroundColor: t.paid }}>
+            <Text style={{ fontSize: FONT.small + 1, color: "#fff", fontWeight: "700" }}>+ Entry</Text>
+          </Pressable>
+        </View>
       </View>
       <View style={{ paddingHorizontal: 16, paddingBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 2, borderColor: t.ink }}>
         <Pressable onPress={onEditParty} accessibilityRole="button" style={{ flexShrink: 1 }}>

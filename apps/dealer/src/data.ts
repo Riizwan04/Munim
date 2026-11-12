@@ -161,3 +161,22 @@ export const saveMaterial = async (businessId: string, m: { id?: string; name: s
 export const updateParty = async (id: string, v: { name: string; phone: string; nicknames: string[]; creditLimit: number | null; opening: number; language: string }) => {
   must(await supabase.from("parties").update({ name: v.name, phone: v.phone, nicknames: v.nicknames, credit_limit: v.creditLimit, opening_balance: v.opening, preferred_language: v.language }).eq("id", id).select("id"));
 };
+
+export interface StatementData { businessName: string; entries: Entry[]; materialNames: Record<string, string>; siteNames: Record<string, string>; sites: { id: string; name: string }[] }
+/** Everything the statement builder needs for one party (active entries only; order = date then creation). */
+export async function loadStatementData(partyId: string): Promise<StatementData> {
+  const [b, m, s, e] = await Promise.all([
+    supabase.from("businesses").select("name").limit(1).maybeSingle(),
+    supabase.from("materials").select("id,name"),
+    supabase.from("sites").select("id,name").eq("party_id", partyId),
+    supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,created_at,entry_lines(material_id,quantity,unit,rate,gst_bp)").eq("party_id", partyId).eq("status", "active").order("entry_date").order("created_at"),
+  ]);
+  for (const r of [b, m, s, e]) if (r.error) throw r.error;
+  return {
+    businessName: b.data?.name ?? "Munim",
+    entries: (e.data ?? []).map(toEntry),
+    materialNames: Object.fromEntries((m.data ?? []).map((x) => [x.id, x.name])),
+    siteNames: Object.fromEntries((s.data ?? []).map((x) => [x.id, x.name])),
+    sites: s.data ?? [],
+  };
+}

@@ -10,3 +10,4 @@ export * from "./spoken";
 export * from "./understand";
 export * from "./stats";
 export * from "./presets";
+export * from "./statement";

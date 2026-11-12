@@ -4,6 +4,9 @@ import { cancelEntry, loadEntry, type EntryDetail as Detail, type PartyRow } fro
 import { rupee } from "./money";
 import { FONT, useTheme } from "./theme";
 import { Btn, Field, Row } from "./ui";
+import { entryMessage, lineText, type Lang } from "@munim/ledger-core";
+import { sendWhatsApp } from "./share";
+import { supabase } from "./supabase";
 
 export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { entryId: string; party: PartyRow; onBack: () => void; onEdit: () => void; onChanged: () => void }) {
   const t = useTheme();
@@ -25,6 +28,21 @@ export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { ent
         <Text style={{ fontSize: FONT.big, fontWeight: "700", color: d.type === "payment" ? t.paid : t.due }}>{rupee(d.amount)}</Text>
         <Text style={{ fontSize: FONT.small, color: t.muted }}>Version {d.version} · {d.status}</Text>
         {err ? <Text style={{ color: t.due }}>{err}</Text> : null}
+        {d.status === "active" && !cancelling && (
+          <Row wrap={false}><Btn label="Party ko WhatsApp par bhejo" onPress={async () => {
+            try {
+              const b = await supabase.from("businesses").select("name").limit(1).maybeSingle();
+              const lang = (["hi", "mr", "en"].includes(party.language) ? party.language : "hi") as Lang;
+              const msg = entryMessage({
+                lang, businessName: b.data?.name ?? "Munim", partyName: party.name, date: d.date, siteName: d.siteName,
+                kind: d.type === "payment" ? "payment" : d.type === "sale" ? "sale" : "other",
+                items: d.lines.map((l) => lineText(l.name, l.qty, l.unit, l.rate)), total: d.amount,
+                paymentMode: (d.paymentMode as any) ?? undefined, newBalance: party.balance,
+              });
+              await sendWhatsApp(party.phone, msg);
+            } catch (e: any) { setErr(e.message ?? String(e)); }
+          }} /></Row>
+        )}
         {d.status === "active" && !cancelling && <Row wrap={false}><Btn kind="ghost" label="Badlo (Edit)" onPress={onEdit} /><Btn kind="danger" label="Cancel entry" onPress={() => setCancelling(true)} /></Row>}
         {cancelling && (
           <View style={{ gap: 10 }}>
