@@ -34,6 +34,7 @@ describe("buildDraft", () => {
   it("RATE is mandatory on every line", () => {
     const r = buildDraft({ ...base, lines: [{ materialId: "jsw", unit: "bag", qty: "80", rate: "" }] }, mats);
     expect(r.errors).toEqual(["Item 1: enter the rate"]);
+    expect(r.issues).toEqual([{ code: "rate", line: 1 }]);
     expect(r.payload).toBeUndefined();
   });
   it("rejects zero rate, missing item, wrong unit, missing qty", () => {

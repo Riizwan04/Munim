@@ -3,15 +3,17 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } fr
 import type { Overview, PartyRow } from "./data";
 import { rupee } from "./money";
 import { supabase } from "./supabase";
+import { useI18n } from "./i18n";
 import { FONT, useTheme } from "./theme";
 
 type Sort = "balance" | "overdue";
 
 /** Home: receivable, today's sales & collections, overdue count (FR-70) and the party list sorted by balance or days overdue (FR-71). */
-export function PartyList({ data, err, onOpen, onAdd, onVoice, onRefresh }: {
-  data: Overview | null; err: string; onOpen: (p: PartyRow) => void; onAdd: () => void; onVoice: () => void; onRefresh: () => Promise<void>;
+export function PartyList({ data, err, onOpen, onAdd, onVoice, onSettings, onRefresh }: {
+  data: Overview | null; err: string; onOpen: (p: PartyRow) => void; onAdd: () => void; onVoice: () => void; onSettings: () => void; onRefresh: () => Promise<void>;
 }) {
   const t = useTheme();
+  const { tr, trn } = useI18n();
   const [refreshing, setRefreshing] = useState(false);
   const [sort, setSort] = useState<Sort>("balance");
   const [q, setQ] = useState("");
@@ -34,21 +36,26 @@ export function PartyList({ data, err, onOpen, onAdd, onVoice, onRefresh }: {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ padding: 16, gap: 12, borderBottomWidth: 2, borderColor: t.ink }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{data.business}</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink, flexShrink: 1 }}>{data.business}</Text>
+          <Pressable onPress={onSettings} accessibilityRole="button" accessibilityLabel={tr("common.settings")} style={{ minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" }}>
+            <Text style={{ fontSize: 26, color: t.muted }}>⚙</Text>
+          </Pressable>
+        </View>
         <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <Text style={{ fontSize: FONT.small, color: t.muted }}>Kul baaki (total receivable)</Text>
+          <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("home.receivable")}</Text>
           <Text style={{ fontSize: FONT.big, fontWeight: "700", color: t.due }}>{rupee(total)}</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
-          {stat("Aaj ki bikri", rupee(data.todaySales), t.fg)}
-          {stat("Aaj mila", rupee(data.todayCollections), t.paid)}
-          {stat("30 din se purana", `${overdue} party`, overdue ? t.due : t.fg)}
+          {stat(tr("home.todaySales"), rupee(data.todaySales), t.fg)}
+          {stat(tr("home.todayReceived"), rupee(data.todayCollections), t.paid)}
+          {stat(tr("home.overdue"), trn("home.parties", overdue), overdue ? t.due : t.fg)}
         </View>
       </View>
       <View style={{ flexDirection: "row", gap: 8, padding: 10, alignItems: "center" }}>
         {(["balance", "overdue"] as Sort[]).map((k) => (
           <Pressable key={k} onPress={() => setSort(k)} accessibilityRole="button" style={{ minHeight: 44, paddingHorizontal: 14, justifyContent: "center", borderRadius: 22, borderWidth: 2, borderColor: sort === k ? t.accent : t.line, backgroundColor: sort === k ? t.accent : t.surface }}>
-            <Text style={{ fontSize: FONT.small, fontWeight: "600", color: sort === k ? t.accentFg : t.fg }}>{k === "balance" ? "Baaki ke hisab se" : "Purane pehle"}</Text>
+            <Text style={{ fontSize: FONT.small, fontWeight: "600", color: sort === k ? t.accentFg : t.fg }}>{k === "balance" ? tr("home.sortBalance") : tr("home.sortOverdue")}</Text>
           </Pressable>
         ))}
       </View>
@@ -56,13 +63,13 @@ export function PartyList({ data, err, onOpen, onAdd, onVoice, onRefresh }: {
         data={list}
         keyExtractor={(p) => p.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await onRefresh(); setRefreshing(false); }} />}
-        ListEmptyComponent={<Text style={{ padding: 24, fontSize: FONT.body, color: t.muted }}>Abhi koi party nahi. "+ Entry" se nayi party jodiye.</Text>}
+        ListEmptyComponent={<Text style={{ padding: 24, fontSize: FONT.body, color: t.muted }}>{tr("home.empty")}</Text>}
         renderItem={({ item }) => (
           <Pressable onPress={() => onOpen(item)} accessibilityRole="button" style={{ padding: 16, minHeight: 64, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderColor: t.rule, backgroundColor: t.surface }}>
             <View style={{ flexShrink: 1 }}>
               <Text style={{ fontSize: FONT.body + 2, fontWeight: "600", color: t.fg }}>{item.name}</Text>
               <Text style={{ fontSize: FONT.small, color: (item.overdueDays ?? 0) > 30 ? t.due : t.muted }}>
-                {item.balance > 0 && item.overdueDays !== null ? `${item.overdueDays} din se baaki` : item.phone}
+                {item.balance > 0 && item.overdueDays !== null ? tr("home.daysDue", { n: item.overdueDays }) : item.phone}
               </Text>
             </View>
             <Text style={{ fontSize: FONT.title, fontWeight: "700", color: item.balance > 0 ? t.due : t.paid }}>{rupee(item.balance)}</Text>
@@ -71,14 +78,14 @@ export function PartyList({ data, err, onOpen, onAdd, onVoice, onRefresh }: {
       />
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, gap: 8 }}>
         <Pressable onPress={() => supabase.auth.signOut()} style={{ padding: 12 }}>
-          <Text style={{ color: t.muted, fontSize: FONT.small }}>Logout</Text>
+          <Text style={{ color: t.muted, fontSize: FONT.small }}>{tr("common.logout")}</Text>
         </Pressable>
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Pressable onPress={onAdd} accessibilityRole="button" style={{ paddingHorizontal: 18, minHeight: 56, justifyContent: "center", borderRadius: 28, borderWidth: 2, borderColor: t.paid }}>
-            <Text style={{ fontSize: FONT.body, color: t.paid, fontWeight: "700" }}>+ Entry</Text>
+            <Text style={{ fontSize: FONT.body, color: t.paid, fontWeight: "700" }}>{tr("home.entry")}</Text>
           </Pressable>
           <Pressable onPress={onVoice} accessibilityRole="button" style={{ paddingHorizontal: 22, minHeight: 56, justifyContent: "center", borderRadius: 28, backgroundColor: t.paid }}>
-            <Text style={{ fontSize: FONT.body + 1, color: "#fff", fontWeight: "700" }}>🎤 Bolo</Text>
+            <Text style={{ fontSize: FONT.body + 1, color: "#fff", fontWeight: "700" }}>{tr("home.speak")}</Text>
           </Pressable>
         </View>
       </View>

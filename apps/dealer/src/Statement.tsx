@@ -5,6 +5,7 @@ import { loadStatementData, type PartyRow, type StatementData } from "./data";
 import { localToday } from "./dates";
 import { rs, rupee } from "./money";
 import { sendWhatsApp, shareText, sharePdf } from "./share";
+import { useI18n } from "./i18n";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Row, Section } from "./ui";
 
@@ -20,6 +21,7 @@ function fromDate(p: Period): string | undefined {
 /** Statement for one party (FR-51/62): choose period, site and language, then send on WhatsApp, share, or make a PDF. */
 export function Statement({ party, onBack }: { party: PartyRow; onBack: () => void }) {
   const t = useTheme();
+  const { tr } = useI18n();
   const [data, setData] = useState<StatementData | null>(null);
   const [err, setErr] = useState("");
   const [period, setPeriod] = useState<Period>("month");
@@ -43,21 +45,21 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <Text onPress={onBack} accessibilityRole="button" style={{ padding: 14, fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ {party.name}</Text>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>Hisaab bhejo</Text>
-        <Section title="Kitne samay ka?">
+        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("st.title")}</Text>
+        <Section title={tr("st.period")}>
           <Row>
-            <Chip label="Is mahine" on={period === "month"} onPress={() => setPeriod("month")} />
-            <Chip label="Pichhle 30 din" on={period === "30"} onPress={() => setPeriod("30")} />
-            <Chip label="Poora hisaab" on={period === "all"} onPress={() => setPeriod("all")} />
+            <Chip label={tr("st.month")} on={period === "month"} onPress={() => setPeriod("month")} />
+            <Chip label={tr("st.30")} on={period === "30"} onPress={() => setPeriod("30")} />
+            <Chip label={tr("st.all")} on={period === "all"} onPress={() => setPeriod("all")} />
           </Row>
         </Section>
         {data.sites.length > 0 && (
-          <Section title="Site">
-            <Row><Chip label="Sab" on={siteId === null} onPress={() => setSiteId(null)} />{data.sites.map((s) => <Chip key={s.id} label={s.name} on={siteId === s.id} onPress={() => setSiteId(s.id)} />)}</Row>
+          <Section title={tr("st.site")}>
+            <Row><Chip label={tr("st.allSites")} on={siteId === null} onPress={() => setSiteId(null)} />{data.sites.map((s) => <Chip key={s.id} label={s.name} on={siteId === s.id} onPress={() => setSiteId(s.id)} />)}</Row>
           </Section>
         )}
-        <Section title="Bhasha">
-          <Row>{([["hi", "Hindi"], ["mr", "Marathi"], ["en", "English"]] as const).map(([k, l]) => <Chip key={k} label={l} on={lang === k} onPress={() => setLang(k)} />)}</Row>
+        <Section title={tr("st.lang")}>
+          <Row>{([["hi", "हिन्दी"], ["mr", "मराठी"], ["en", "English"]] as const).map(([k, l]) => <Chip key={k} label={l} on={lang === k} onPress={() => setLang(k)} />)}</Row>
         </Section>
 
         <View style={{ borderWidth: 2, borderColor: t.line, borderRadius: 12, backgroundColor: t.surface, overflow: "hidden" }}>
@@ -65,7 +67,7 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
             <Text style={{ fontSize: FONT.small, color: t.muted }}>{L.opening}</Text>
             <Text style={{ fontSize: FONT.body + 2, fontWeight: "700", color: t.fg }}>{rupee(stmt.opening)}</Text>
           </View>
-          {stmt.rows.length === 0 && <Text style={{ padding: 14, color: t.muted, fontSize: FONT.body }}>Is samay mein koi entry nahi.</Text>}
+          {stmt.rows.length === 0 && <Text style={{ padding: 14, color: t.muted, fontSize: FONT.body }}>{tr("st.empty")}</Text>}
           {stmt.rows.map((r, i) => (
             <View key={r.entryId + i} style={{ flexDirection: "row", gap: 8, padding: 12, borderBottomWidth: 1, borderColor: t.rule, backgroundColor: r.kind === "payment" ? t.paidBg : t.surface }}>
               <Text style={{ width: 52, fontSize: FONT.small, color: t.muted }}>{r.date.slice(8, 10)}-{r.date.slice(5, 7)}</Text>
@@ -82,13 +84,13 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
           </View>
         </View>
 
-        <Row wrap={false}><Btn label="WhatsApp par bhejo" onPress={() => run(() => sendWhatsApp(party.phone, text), "WhatsApp khul raha hai. Wahan 'send' dabaiye.")} /></Row>
+        <Row wrap={false}><Btn label={tr("st.wa")} onPress={() => run(() => sendWhatsApp(party.phone, text), tr("st.waNote"))} /></Row>
         <Row wrap={false}>
-          <Btn kind="ghost" label="Share karo" onPress={() => run(() => shareText(text), "Ho gaya.")} />
-          <Btn kind="ghost" label="PDF banao" onPress={() => run(() => sharePdf(statementHtml(stmt)), "PDF taiyaar.")} />
+          <Btn kind="ghost" label={tr("st.share")} onPress={() => run(() => shareText(text), tr("st.done"))} />
+          <Btn kind="ghost" label={tr("st.pdf")} onPress={() => run(() => sharePdf(statementHtml(stmt)), tr("st.pdfDone"))} />
         </Row>
         {note ? <Text style={{ fontSize: FONT.small, color: t.muted }}>{note}</Text> : null}
-        <Text style={{ fontSize: FONT.small, color: t.muted }}>Message bhejne ke liye aapko WhatsApp mein 'send' dabana hoga.</Text>
+        <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("st.hint")}</Text>
       </ScrollView>
     </View>
   );

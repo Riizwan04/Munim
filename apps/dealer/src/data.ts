@@ -43,9 +43,7 @@ export async function loadParties(): Promise<Overview> {
   return { businessId: b.data?.id ?? "", business: b.data?.name ?? "Munim", parties, todaySales, todayCollections };
 }
 
-const MODE: Record<string, string> = { cash: "Cash", upi: "Online (UPI)", cheque: "Cheque", bank: "Bank transfer" };
 const trim = (n: number) => String(Math.round(n * 1000) / 1000);
-const label = (type: string) => (type === "charge" ? "Gaadi bhada / Charge" : type === "discount" ? "Discount" : type === "return" ? "Return" : "");
 
 /** Builds the notebook-style rows (Layout A): opening balance, entries, balance after each payment, final total. */
 export async function loadLedger(party: PartyRow): Promise<LedgerRow[]> {
@@ -55,7 +53,7 @@ export async function loadLedger(party: PartyRow): Promise<LedgerRow[]> {
   ]);
   if (e.error) throw e.error;
   const sites = new Map((s.data ?? []).map((x) => [x.id, x.name]));
-  const rows: LedgerRow[] = [{ key: "open", kind: "balance", item: "Balance", amount: party.opening }];
+  const rows: LedgerRow[] = [{ key: "open", kind: "balance", item: "@balance", amount: party.opening }];
   let running = party.opening;
   for (const r of e.data ?? []) {
     const entry = toEntry(r);
@@ -63,9 +61,9 @@ export async function loadLedger(party: PartyRow): Promise<LedgerRow[]> {
     const site = r.site_id ? sites.get(r.site_id) : undefined;
     const date = r.entry_date.slice(8, 10) + "-" + r.entry_date.slice(5, 7);
     if (r.type === "payment") {
-      rows.push({ key: r.id, entryId: r.id, kind: "payment", date, item: MODE[r.payment_mode as string] ?? "Paid", amount: eff, site });
+      rows.push({ key: r.id, entryId: r.id, kind: "payment", date, item: `@mode:${r.payment_mode ?? "paid"}`, amount: eff, site });
       running += eff;
-      rows.push({ key: r.id + "b", kind: "balance", item: "Balance", amount: running });
+      rows.push({ key: r.id + "b", kind: "balance", item: "@balance", amount: running });
       continue;
     }
     if (r.entry_lines?.length) {
@@ -73,11 +71,11 @@ export async function loadLedger(party: PartyRow): Promise<LedgerRow[]> {
         rows.push({ key: r.id + i, entryId: r.id, kind: "line", date: i === 0 ? date : undefined, item: l.materials?.name ?? "Item",
           qty: `${trim(Number(l.quantity) / 1000)} ${l.unit}`, rate: Number(l.rate), amount: Number(l.line_total), site: i === 0 ? site : undefined }));
     } else {
-      rows.push({ key: r.id, entryId: r.id, kind: "charge", date, item: label(r.type), amount: eff, site });
+      rows.push({ key: r.id, entryId: r.id, kind: "charge", date, item: `@${r.type}`, amount: eff, site });
     }
     running += eff;
   }
-  rows.push({ key: "total", kind: "total", item: "Total", amount: running });
+  rows.push({ key: "total", kind: "total", item: "@total", amount: running });
   return rows;
 }
 
@@ -119,7 +117,7 @@ export const saveEntry = async (p: EntryPayload) => must(await supabase.rpc("sav
 export const editEntry = async (id: string, p: EntryPayload, reason: string) => must(await supabase.rpc("edit_entry", { p_entry_id: id, p, p_reason: reason }));
 export const cancelEntry = async (id: string, reason: string) => { must(await supabase.rpc("cancel_entry", { p_entry_id: id, p_reason: reason })); };
 export const createParty = async (businessId: string, name: string, phone: string) =>
-  must(await supabase.from("parties").insert({ business_id: businessId, name, phone }).select("id").single()).id as string;
+  must(await supabase.from("parties").insert({ business_id: businessId, name, phone, preferred_language: "en" }).select("id").single()).id as string;
 export const createSite = async (businessId: string, partyId: string, name: string) =>
   must(await supabase.from("sites").insert({ business_id: businessId, party_id: partyId, name }).select("id").single()).id as string;
 
@@ -140,7 +138,7 @@ export async function loadUnderstandContext(): Promise<{ parties: PartyRef[]; ma
 
 // ───────── setup & masters ─────────
 export async function createBusinessWithPreset(name: string, phone: string, presetKey: string): Promise<void> {
-  const id = must(await supabase.rpc("create_business", { p_name: name, p_phone: phone, p_language: "hi", p_type: presetKey })) as string;
+  const id = must(await supabase.rpc("create_business", { p_name: name, p_phone: phone, p_language: "en", p_type: presetKey })) as string;
   const items = getPreset(presetKey)?.items ?? [];
   if (items.length) {
     must(await supabase.from("materials").insert(items.map((i) => ({ business_id: id, name: i.name, category: i.category, units: i.units, local_names: i.localNames ?? [] }))).select("id"));

@@ -29,7 +29,10 @@ export interface EntryPayload {
   amount: Paise; payment_mode: PaymentMode | null; source: "voice" | "manual"; transcript: string | null;
   lines: { material_id: string; quantity: MilliQty; unit: string; rate: Paise; gst_bp: number | null; line_total: Paise }[];
 }
-export interface DraftResult { errors: string[]; payload?: EntryPayload; total: Paise; lineTotals: Paise[] }
+export type DraftIssueCode = "date" | "items" | "item" | "unit" | "qty" | "rate" | "amount" | "mode";
+/** Machine-readable form of each error so the app can show it in any language. `line` is 1-based. */
+export interface DraftIssue { code: DraftIssueCode; line?: number }
+export interface DraftResult { errors: string[]; issues: DraftIssue[]; payload?: EntryPayload; total: Paise; lineTotals: Paise[] }
 
 /**
  * Validates a half-typed entry and builds the payload for save_entry.
@@ -38,22 +41,24 @@ export interface DraftResult { errors: string[]; payload?: EntryPayload; total: 
  */
 export function buildDraft(input: DraftInput, materials: MaterialRef[]): DraftResult {
   const errors: string[] = [];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || Number.isNaN(Date.parse(input.date))) errors.push("Date is not valid");
+  const issues: DraftIssue[] = [];
+  const err = (message: string, code: DraftIssueCode, line?: number) => { errors.push(message); issues.push({ code, line }); };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || Number.isNaN(Date.parse(input.date))) err("Date is not valid", "date");
   const lines: EntryPayload["lines"] = [];
   const lineTotals: Paise[] = [];
   let total = 0;
 
   if (input.type === "sale" || input.type === "return") {
-    if (input.lines.length === 0) errors.push("Add at least one item");
+    if (input.lines.length === 0) err("Add at least one item", "items");
     input.lines.forEach((l, i) => {
       const n = i + 1;
       const m = materials.find((x) => x.id === l.materialId);
-      if (!m) { errors.push(`Item ${n}: choose the item`); return; }
-      if (!l.unit || !validUnit(m, l.unit)) { errors.push(`Item ${n}: choose a unit for ${m.name}`); return; }
+      if (!m) { err(`Item ${n}: choose the item`, "item", n); return; }
+      if (!l.unit || !validUnit(m, l.unit)) { err(`Item ${n}: choose a unit for ${m.name}`, "unit", n); return; }
       const quantity = parseQty(l.qty);
-      if (quantity === null) { errors.push(`Item ${n}: enter the quantity`); return; }
+      if (quantity === null) { err(`Item ${n}: enter the quantity`, "qty", n); return; }
       const rate = parseRupees(l.rate);
-      if (rate === null || rate <= 0) { errors.push(`Item ${n}: enter the rate`); return; }
+      if (rate === null || rate <= 0) { err(`Item ${n}: enter the rate`, "rate", n); return; }
       const lt = lineTotal({ materialId: m.id, quantity, unit: l.unit, rate });
       lines.push({ material_id: m.id, quantity, unit: l.unit, rate, gst_bp: null, line_total: lt });
       lineTotals.push(lt);
@@ -61,13 +66,13 @@ export function buildDraft(input: DraftInput, materials: MaterialRef[]): DraftRe
     });
   } else {
     const a = parseRupees(input.amount);
-    if (a === null || a <= 0) errors.push("Enter the amount");
+    if (a === null || a <= 0) err("Enter the amount", "amount");
     else total = a;
-    if (input.type === "payment" && !input.paymentMode) errors.push("Choose how it was paid");
+    if (input.type === "payment" && !input.paymentMode) err("Choose how it was paid", "mode");
   }
-  if (errors.length) return { errors, total, lineTotals };
+  if (errors.length) return { errors, issues, total, lineTotals };
   return {
-    errors, total, lineTotals,
+    errors, issues, total, lineTotals,
     payload: {
       business_id: input.businessId, party_id: input.partyId, site_id: input.siteId ?? null, type: input.type,
       entry_date: input.date, amount: total, payment_mode: input.type === "payment" ? (input.paymentMode ?? null) : null,

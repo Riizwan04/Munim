@@ -9,6 +9,8 @@ import { Ledger } from "./src/Ledger";
 import { Login } from "./src/Login";
 import { Voice } from "./src/Voice";
 import { Statement } from "./src/Statement";
+import { Settings } from "./src/Settings";
+import { I18nProvider, useI18n } from "./src/i18n";
 import { Reminders } from "./src/Reminders";
 import { Onboarding } from "./src/Onboarding";
 import { Items } from "./src/Items";
@@ -27,14 +29,16 @@ type Screen =
   | { name: "ledger"; party: PartyRow }
   | { name: "voice" }
   | { name: "items" }
+  | { name: "settings" }
   | { name: "reminders"; only?: PartyRow }
   | { name: "statement"; party: PartyRow }
   | { name: "partyEdit"; party: PartyRow }
   | { name: "add"; party?: PartyRow; editingId?: string }
   | { name: "detail"; party: PartyRow; entryId: string };
 
-export default function App() {
+function AppInner() {
   const t = useTheme();
+  const { tr } = useI18n();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [screen, setScreen] = useState<Screen>({ name: "parties" });
   const [data, setData] = useState<Overview | null>(null);
@@ -67,6 +71,7 @@ export default function App() {
   else if (screen.name === "reminders" && data)
     body = <Reminders businessId={data.businessId} business={data.business} parties={data.parties} only={screen.only}
       onClose={async () => { await refresh(); setScreen(screen.only ? { name: "ledger", party: screen.only } : { name: "parties" }); }} />;
+  else if (screen.name === "settings") body = <Settings onBack={() => setScreen({ name: "parties" })} />;
   else if (screen.name === "statement")
     body = <Statement party={fresh(screen.party)!} onBack={() => setScreen({ name: "ledger", party: screen.party })} />;
   else if (screen.name === "partyEdit")
@@ -75,7 +80,7 @@ export default function App() {
     body = <Voice onCancel={() => setScreen({ name: "parties" })} onResolved={(items, text) => { setQueue({ items, i: 0, text }); setScreen({ name: "add" }); }} />;
   else if (screen.name === "add" && data)
     body = <AddEntry key={queue ? `q${queue.i}` : "plain"} businessId={data.businessId} parties={data.parties} initialParty={fresh(screen.party)} editingId={screen.editingId}
-      prefill={queue?.items[queue.i]} transcript={queue?.text} queueLabel={queue && queue.items.length > 1 ? `Entry ${queue.i + 1}/${queue.items.length}` : undefined}
+      prefill={queue?.items[queue.i]} transcript={queue?.text} queuePos={queue ? { i: queue.i, n: queue.items.length } : undefined}
       onSkip={queue ? () => nextInQueue(undefined) : undefined}
       onCancel={() => { setQueue(null);  setScreen(screen.party ? (screen.editingId ? { name: "detail", party: screen.party, entryId: screen.editingId } : { name: "ledger", party: screen.party }) : { name: "parties" }); }}
       onDone={(p) => nextInQueue(p)} />;
@@ -87,7 +92,7 @@ export default function App() {
     const p = fresh(screen.party)!;
     body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} onEditParty={() => setScreen({ name: "partyEdit", party: p })} onStatement={() => setScreen({ name: "statement", party: p })} onRemind={() => setScreen({ name: "reminders", only: p })} />;
   } else if (screen.name === "items" && data) body = <Items businessId={data.businessId} />;
-  else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onVoice={() => setScreen({ name: "voice" })} />;
+  else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onVoice={() => setScreen({ name: "voice" })} onSettings={() => setScreen({ name: "settings" })} />;
 
   return (
     <SafeAreaProvider>
@@ -96,7 +101,7 @@ export default function App() {
         <View style={{ flex: 1 }}>{body}</View>
         {session && data?.businessId && (screen.name === "parties" || screen.name === "items" || (screen.name === "reminders" && !screen.only)) ? (
           <View style={{ flexDirection: "row", borderTopWidth: 1, borderColor: t.line, backgroundColor: t.surface }}>
-            {([["parties", "Parties"], ["reminders", "Yaad dilao"], ["items", "Maal"]] as const).map(([k, label]) => (
+            {([["parties", tr("tab.parties")], ["reminders", tr("tab.reminders")], ["items", tr("tab.items")]] as const).map(([k, label]) => (
               <Pressable key={k} onPress={() => setScreen(k === "items" ? { name: "items" } : k === "reminders" ? { name: "reminders" } : { name: "parties" })} accessibilityRole="tab" style={{ flex: 1, minHeight: 56, alignItems: "center", justifyContent: "center", borderTopWidth: 3, borderColor: screen.name === k ? t.accent : "transparent" }}>
                 <Text style={{ fontSize: FONT.body, fontWeight: "700", color: screen.name === k ? t.accent : t.muted }}>{label}</Text>
               </Pressable>
@@ -105,5 +110,13 @@ export default function App() {
         ) : null}
       </SafeAreaView>
     </SafeAreaProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <I18nProvider>
+      <AppInner />
+    </I18nProvider>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { loadLedger, type LedgerRow, type PartyRow } from "./data";
 import { rs, rupee } from "./money";
+import { useI18n } from "./i18n";
 import { FONT, useTheme } from "./theme";
 
 // Notebook layout (Layout A): Date | Item | Qty | Rate | Amount | Site — same as the paper khata, plus Rate.
@@ -10,6 +11,8 @@ const W = { date: 64, qty: 86, rate: 60, amt: 90 };
 
 export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement, onRemind }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void; onEditParty: () => void; onStatement: () => void; onRemind: () => void }) {
   const t = useTheme();
+  const { tr } = useI18n();
+  const itemLabel = (it: string) => (it === "@balance" ? tr("row.balance") : it === "@total" ? tr("row.total") : it.startsWith("@mode:") ? tr(`mode.${it.slice(6)}` as never) : it === "@charge" ? tr("row.charge") : it === "@discount" ? tr("row.discount") : it === "@return" ? tr("row.return") : it);
   const [rows, setRows] = useState<LedgerRow[] | null>(null);
   const [err, setErr] = useState("");
   useEffect(() => { loadLedger(party).then(setRows).catch((e) => setErr(e.message ?? String(e))); }, [party]);
@@ -20,29 +23,29 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement,
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
         <Pressable onPress={onBack} accessibilityRole="button" style={{ padding: 14, minHeight: 52, justifyContent: "center" }}>
-          <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ Parties</Text>
+          <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>{tr("ledger.parties")}</Text>
         </Pressable>
         <View style={{ flexDirection: "row", gap: 6, margin: 8 }}>
           {party.balance > 0 && (
             <Pressable onPress={onRemind} accessibilityRole="button" style={{ paddingHorizontal: 12, minHeight: 48, justifyContent: "center", borderRadius: 24, borderWidth: 2, borderColor: t.due }}>
-              <Text style={{ fontSize: FONT.small + 1, color: t.due, fontWeight: "700" }}>Yaad dilao</Text>
+              <Text style={{ fontSize: FONT.small + 1, color: t.due, fontWeight: "700" }}>{tr("ledger.remind")}</Text>
             </Pressable>
           )}
           <Pressable onPress={onStatement} accessibilityRole="button" style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: "center", borderRadius: 24, borderWidth: 2, borderColor: t.accent }}>
-            <Text style={{ fontSize: FONT.small + 1, color: t.accent, fontWeight: "700" }}>Hisaab bhejo</Text>
+            <Text style={{ fontSize: FONT.small + 1, color: t.accent, fontWeight: "700" }}>{tr("ledger.statement")}</Text>
           </Pressable>
           <Pressable onPress={onAdd} accessibilityRole="button" style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: "center", borderRadius: 24, backgroundColor: t.paid }}>
-            <Text style={{ fontSize: FONT.small + 1, color: "#fff", fontWeight: "700" }}>+ Entry</Text>
+            <Text style={{ fontSize: FONT.small + 1, color: "#fff", fontWeight: "700" }}>{tr("home.entry")}</Text>
           </Pressable>
         </View>
       </View>
       <View style={{ paddingHorizontal: 16, paddingBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 2, borderColor: t.ink }}>
         <Pressable onPress={onEditParty} accessibilityRole="button" style={{ flexShrink: 1 }}>
           <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{party.name}</Text>
-          <Text style={{ fontSize: 13, color: t.accent }}>Jaankari badlo ›</Text>
+          <Text style={{ fontSize: 13, color: t.accent }}>{tr("ledger.editParty")}</Text>
         </Pressable>
         <View style={{ alignItems: "flex-end" }}>
-          <Text style={{ fontSize: 14, color: t.muted }}>Kul baaki</Text>
+          <Text style={{ fontSize: 14, color: t.muted }}>{tr("ledger.balanceDue")}</Text>
           <Text style={{ fontSize: FONT.big, fontWeight: "700", color: t.due }}>{rupee(total)}</Text>
         </View>
       </View>
@@ -50,11 +53,11 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement,
         <ScrollView>
           <View style={{ backgroundColor: t.surface }}>
             <View style={{ flexDirection: "row", borderBottomWidth: 2, borderColor: t.ink }}>
-              <View style={cell(W.date)}><Text style={txt(t.muted, true, 12)}>DATE</Text></View>
-              <View style={cell(undefined)}><Text style={txt(t.muted, true, 12)}>ITEM</Text></View>
-              <View style={cell(W.qty, true)}><Text style={txt(t.muted, true, 12)}>QTY</Text></View>
-              <View style={cell(W.rate, true)}><Text style={txt(t.muted, true, 12)}>RATE</Text></View>
-              <View style={cell(W.amt, true)}><Text style={txt(t.muted, true, 12)}>AMOUNT</Text></View>
+              <View style={cell(W.date)}><Text style={txt(t.muted, true, 12)}>{tr("col.date")}</Text></View>
+              <View style={cell(undefined)}><Text style={txt(t.muted, true, 12)}>{tr("col.item")}</Text></View>
+              <View style={cell(W.qty, true)}><Text style={txt(t.muted, true, 12)}>{tr("col.qty")}</Text></View>
+              <View style={cell(W.rate, true)}><Text style={txt(t.muted, true, 12)}>{tr("col.rate")}</Text></View>
+              <View style={cell(W.amt, true)}><Text style={txt(t.muted, true, 12)}>{tr("col.amount")}</Text></View>
             </View>
             {rows.map((r) => {
               const isBal = r.kind === "balance" || r.kind === "total";
@@ -65,7 +68,7 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement,
                 <Pressable key={r.key} disabled={!r.entryId} onPress={() => r.entryId && onOpen(r.entryId)} style={{ flexDirection: "row", borderBottomWidth: r.kind === "total" ? 0 : 1, borderTopWidth: r.kind === "total" ? 2 : 0, borderColor: r.kind === "total" ? t.ink : t.rule, backgroundColor: isPay ? t.paidBg : isBal ? t.bg : t.surface }}>
                   <View style={cell(W.date)}><Text numberOfLines={1} style={txt(t.muted, false, fs)}>{r.date ?? ""}</Text></View>
                   <View style={cell(undefined)}>
-                    <Text style={txt(color, isBal || isPay, fs + 1)}>{r.item}</Text>
+                    <Text style={txt(color, isBal || isPay, fs + 1)}>{itemLabel(r.item)}</Text>
                     {r.site ? <Text style={txt(t.muted, false, 13)}>{r.site}</Text> : null}
                   </View>
                   <View style={cell(W.qty, true)}><Text numberOfLines={1} style={txt(color, false, fs)}>{r.qty ?? ""}</Text></View>
