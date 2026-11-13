@@ -10,6 +10,8 @@ import { Login } from "./src/Login";
 import { Voice } from "./src/Voice";
 import { Statement } from "./src/Statement";
 import { Settings } from "./src/Settings";
+import { Reports } from "./src/Reports";
+import { Import } from "./src/Import";
 import { I18nProvider, useI18n } from "./src/i18n";
 import { Reminders } from "./src/Reminders";
 import { Onboarding } from "./src/Onboarding";
@@ -29,6 +31,8 @@ type Screen =
   | { name: "ledger"; party: PartyRow }
   | { name: "voice" }
   | { name: "items" }
+  | { name: "reports" }
+  | { name: "import" }
   | { name: "settings" }
   | { name: "reminders"; only?: PartyRow }
   | { name: "statement"; party: PartyRow }
@@ -71,6 +75,8 @@ function AppInner() {
   else if (screen.name === "reminders" && data)
     body = <Reminders businessId={data.businessId} business={data.business} parties={data.parties} only={screen.only}
       onClose={async () => { await refresh(); setScreen(screen.only ? { name: "ledger", party: screen.only } : { name: "parties" }); }} />;
+  else if (screen.name === "import" && data) body = <Import businessId={data.businessId} parties={data.parties} onClose={() => setScreen({ name: "reports" })} onDone={() => { refresh(); setRev((n) => n + 1); }} />;
+  else if (screen.name === "reports") body = <Reports key={rev} onImport={() => setScreen({ name: "import" })} />;
   else if (screen.name === "settings") body = <Settings onBack={() => setScreen({ name: "parties" })} />;
   else if (screen.name === "statement")
     body = <Statement party={fresh(screen.party)!} onBack={() => setScreen({ name: "ledger", party: screen.party })} />;
@@ -99,10 +105,10 @@ function AppInner() {
       <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
         <StatusBar style="auto" />
         <View style={{ flex: 1 }}>{body}</View>
-        {session && data?.businessId && (screen.name === "parties" || screen.name === "items" || (screen.name === "reminders" && !screen.only)) ? (
+        {session && data?.businessId && (screen.name === "parties" || screen.name === "items" || screen.name === "reports" || (screen.name === "reminders" && !screen.only)) ? (
           <View style={{ flexDirection: "row", borderTopWidth: 1, borderColor: t.line, backgroundColor: t.surface }}>
-            {([["parties", tr("tab.parties")], ["reminders", tr("tab.reminders")], ["items", tr("tab.items")]] as const).map(([k, label]) => (
-              <Pressable key={k} onPress={() => setScreen(k === "items" ? { name: "items" } : k === "reminders" ? { name: "reminders" } : { name: "parties" })} accessibilityRole="tab" style={{ flex: 1, minHeight: 56, alignItems: "center", justifyContent: "center", borderTopWidth: 3, borderColor: screen.name === k ? t.accent : "transparent" }}>
+            {([["parties", tr("tab.parties")], ["reminders", tr("tab.reminders")], ["reports", tr("tab.reports")], ["items", tr("tab.items")]] as const).map(([k, label]) => (
+              <Pressable key={k} onPress={() => setScreen(k === "items" ? { name: "items" } : k === "reminders" ? { name: "reminders" } : k === "reports" ? { name: "reports" } : { name: "parties" })} accessibilityRole="tab" style={{ flex: 1, minHeight: 56, alignItems: "center", justifyContent: "center", borderTopWidth: 3, borderColor: screen.name === k ? t.accent : "transparent" }}>
                 <Text style={{ fontSize: FONT.body, fontWeight: "700", color: screen.name === k ? t.accent : t.muted }}>{label}</Text>
               </Pressable>
             ))}

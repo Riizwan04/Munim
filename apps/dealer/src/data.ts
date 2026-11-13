@@ -1,4 +1,4 @@
-import { partyStats, getPreset, partyBalance, entryEffect, type Entry, type EntryPayload, type MaterialRef, type PartyRef } from "@munim/ledger-core";
+import { partyStats, getPreset, partyBalance, entryEffect, type Entry, type EntryPayload, type MaterialRef, type PartyRef, type EntryType } from "@munim/ledger-core";
 import { localToday } from "./dates";
 import { supabase } from "./supabase";
 
@@ -191,4 +191,48 @@ export async function loadReminderLog(): Promise<Record<string, string>> {
 export async function logReminder(businessId: string, partyId: string, amount: number, message: string): Promise<void> {
   const r = await supabase.from("reminders").insert({ business_id: businessId, party_id: partyId, amount, message, channel: "whatsapp" });
   if (r.error) throw new Error(r.error.message);
+}
+
+// ───────── reports ─────────
+export interface ReportData {
+  businessName: string; parties: { id: string; name: string; opening: number }[]; entries: Entry[];
+  materials: Record<string, { name: string; category: string | null }>; sites: Record<string, string>;
+}
+/** Everything the report builder needs: all parties, active entries with lines, item and site names. */
+export async function loadReportData(): Promise<ReportData> {
+  const [b, p, m, s, e] = await Promise.all([
+    supabase.from("businesses").select("name").limit(1).maybeSingle(),
+    supabase.from("parties").select("id,name,opening_balance"),
+    supabase.from("materials").select("id,name,category"),
+    supabase.from("sites").select("id,name"),
+    supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,entry_lines(material_id,quantity,unit,rate,gst_bp)").eq("status", "active").order("entry_date").limit(20000),
+  ]);
+  for (const r of [b, p, m, s, e]) if (r.error) throw r.error;
+  return {
+    businessName: b.data?.name ?? "Munim",
+    parties: (p.data ?? []).map((x) => ({ id: x.id, name: x.name, opening: Number(x.opening_balance) })),
+    entries: (e.data ?? []).map(toEntry),
+    materials: Object.fromEntries((m.data ?? []).map((x) => [x.id, { name: x.name, category: x.category }])),
+    sites: Object.fromEntries((s.data ?? []).map((x) => [x.id, x.name])),
+  };
+}
+
+// ───────── importing handwritten pages ─────────
+export async function loadImportContext(partyId: string): Promise<{ sites: { id: string; name: string }[]; materials: MaterialRef[]; existing: { date: string; type: EntryType; amount: number }[] }> {
+  const [s, materials, e] = await Promise.all([
+    supabase.from("sites").select("id,name").eq("party_id", partyId),
+    loadMaterials(),
+    supabase.from("entries").select("entry_date,type,amount").eq("party_id", partyId).eq("status", "active"),
+  ]);
+  if (s.error) throw s.error;
+  if (e.error) throw e.error;
+  return { sites: s.data ?? [], materials, existing: (e.data ?? []).map((x) => ({ date: x.entry_date, type: x.type as EntryType, amount: Number(x.amount) })) };
+}
+export const createPartyWithOpening = async (businessId: string, name: string, phone: string, openingPaise: number) =>
+  must(await supabase.from("parties").insert({ business_id: businessId, name, phone, opening_balance: openingPaise, preferred_language: "en" }).select("id").single()).id as string;
+/** Asks the "scan-ledger" edge function (AI vision) to read a photo of a khata page. Returns its raw JSON text. */
+export async function scanPagePhoto(base64: string, mime: string): Promise<string> {
+  const r = await supabase.functions.invoke("scan-ledger", { body: { image: base64, mime } });
+  if (r.error) throw new Error(r.error.message);
+  return typeof r.data === "string" ? r.data : JSON.stringify(r.data);
 }
