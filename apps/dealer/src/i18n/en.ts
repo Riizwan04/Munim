@@ -155,5 +155,16 @@ export const en = {
   "im.again": "Import another page",
   "im.rowIssue": "Check this row",
   "im.reportsLink": "Back to reports",
+  "login.create": "Create account",
+  "login.haveAccount": "I already have an account",
+  "login.signup": "Sign up",
+  "login.pwHint": "Password: at least 8 characters",
+  "login.confirmEmail": "Account created. Check your email, confirm it, then log in.",
+  "login.badEmail": "Enter a valid email address.",
+  "login.shortPw": "The password must be at least 8 characters.",
+  "setup.title": "App setup is incomplete",
+  "setup.body": "The Supabase address or key is missing or contains a wrong character (for example a space or “…”). Re-enter both values in the hosting settings, then redeploy.",
+  "setup.url": "Problem with the address (EXPO_PUBLIC_SUPABASE_URL)",
+  "setup.key": "Problem with the key (EXPO_PUBLIC_SUPABASE_ANON_KEY)",
 } as const;
 export type Key = keyof typeof en;

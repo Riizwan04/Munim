@@ -22,7 +22,7 @@ import { FONT } from "./src/theme";
 import type { ResolvedEntry } from "@munim/ledger-core";
 import { PartyList } from "./src/PartyList";
 import { loadParties, type Overview, type PartyRow } from "./src/data";
-import { supabase } from "./src/supabase";
+import { configProblems, supabase } from "./src/supabase";
 import { useTheme } from "./src/theme";
 
 type PartyRef2 = PartyRow;
@@ -69,6 +69,18 @@ function AppInner() {
   };
   const fresh = (p: PartyRow | undefined) => (p && data ? data.parties.find((x) => x.id === p.id) ?? p : p);
   let body;
+  if (configProblems.length) {
+    return (
+      <SafeAreaProvider><SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
+        <View style={{ flex: 1, justifyContent: "center", gap: 12, padding: 24 }}>
+          <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.due }}>{tr("setup.title")}</Text>
+          <Text style={{ fontSize: FONT.body, color: t.fg }}>{tr("setup.body")}</Text>
+          {configProblems.some((p) => p.endsWith("url")) ? <Text style={{ fontSize: FONT.small, color: t.muted }}>• {tr("setup.url")}</Text> : null}
+          {configProblems.some((p) => p.endsWith("key")) ? <Text style={{ fontSize: FONT.small, color: t.muted }}>• {tr("setup.key")}</Text> : null}
+        </View>
+      </SafeAreaView></SafeAreaProvider>
+    );
+  }
   if (session === undefined) body = <View style={{ flex: 1, justifyContent: "center" }}><ActivityIndicator /></View>;
   else if (!session) body = <Login />;
   else if (data && !data.businessId) body = <Onboarding onDone={refresh} />;

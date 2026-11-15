@@ -14,3 +14,4 @@ export * from "./statement";
 export * from "./phonetic";
 export * from "./reports";
 export * from "./importPage";
+export * from "./config";
