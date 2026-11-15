@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
-import { buildStatement, labels, statementHtml, statementText, type Lang } from "@munim/ledger-core";
-import { loadStatementData, type PartyRow, type StatementData } from "./data";
+import { buildStatement, linkMessage, statementHtml, statementText, statementUrl, type Lang } from "@munim/ledger-core";
+import { createStatementLink, loadStatementData, loadStatementLinks, revokeStatementLink, webOrigin, type LinkRow, type PartyRow, type StatementData } from "./data";
 import { localToday } from "./dates";
-import { rs, rupee } from "./money";
+import { StatementCard } from "./StatementCard";
 import { sendWhatsApp, shareText, sharePdf } from "./share";
 import { useI18n } from "./i18n";
 import { fe } from "./errors";
@@ -29,17 +29,32 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
   const [siteId, setSiteId] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>((["hi", "mr", "en"].includes(party.language) ? party.language : "hi") as Lang);
   const [note, setNote] = useState("");
+  const [days, setDays] = useState(30);
+  const [links, setLinks] = useState<LinkRow[]>([]);
+  const [lastUrl, setLastUrl] = useState("");
+  const reloadLinks = () => loadStatementLinks(party.id).then(setLinks);
+  useEffect(() => { reloadLinks(); }, [party.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadStatementData(party.id).then(setData).catch((e) => setErr(fe(e))); }, [party.id]);
 
   const stmt = useMemo(() => data && buildStatement({
     businessName: data.businessName, partyName: party.name, opening: party.opening, entries: data.entries,
     materialNames: data.materialNames, siteNames: data.siteNames, from: fromDate(period), to: localToday(), siteId, lang,
   }), [data, party, period, siteId, lang]);
-  const L = labels(lang);
 
   if (err) return <Text style={{ color: t.due, padding: 16 }}>{err}</Text>;
   if (!data || !stmt) return <ActivityIndicator style={{ flex: 1 }} />;
   const text = statementText(stmt);
+  const makeLink = async () => {
+    const origin = webOrigin();
+    if (!origin) { setNote(tr("ln.noWeb")); return; }
+    try {
+      const l = await createStatementLink(party.id, days);
+      const url = statementUrl(origin, l.token);
+      setLastUrl(url);
+      await sendWhatsApp(party.phone, linkMessage({ lang, businessName: data!.businessName, partyName: party.name, url, balance: stmt!.closing }));
+      setNote(tr("ln.created")); reloadLinks();
+    } catch (e: any) { setNote(fe(e)); }
+  };
   const run = async (fn: () => Promise<unknown>, done: string) => { try { await fn(); setNote(done); } catch (e: any) { setNote(fe(e)); } };
 
   return (
@@ -63,27 +78,7 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
           <Row>{([["hi", "हिन्दी"], ["mr", "मराठी"], ["en", "English"]] as const).map(([k, l]) => <Chip key={k} label={l} on={lang === k} onPress={() => setLang(k)} />)}</Row>
         </Section>
 
-        <View style={{ borderWidth: 2, borderColor: t.line, borderRadius: 12, backgroundColor: t.surface, overflow: "hidden" }}>
-          <View style={{ padding: 12, gap: 2, borderBottomWidth: 2, borderColor: t.ink }}>
-            <Text style={{ fontSize: FONT.small, color: t.muted }}>{L.opening}</Text>
-            <Text style={{ fontSize: FONT.body + 2, fontWeight: "700", color: t.fg }}>{rupee(stmt.opening)}</Text>
-          </View>
-          {stmt.rows.length === 0 && <Text style={{ padding: 14, color: t.muted, fontSize: FONT.body }}>{tr("st.empty")}</Text>}
-          {stmt.rows.map((r, i) => (
-            <View key={r.entryId + i} style={{ flexDirection: "row", gap: 8, padding: 12, borderBottomWidth: 1, borderColor: t.rule, backgroundColor: r.kind === "payment" ? t.paidBg : t.surface }}>
-              <Text style={{ width: 52, fontSize: FONT.small, color: t.muted }}>{r.date.slice(8, 10)}-{r.date.slice(5, 7)}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: FONT.body, color: r.kind === "payment" ? t.paid : t.ink }}>{r.text}</Text>
-                {r.site ? <Text style={{ fontSize: 13, color: t.muted }}>{r.site}</Text> : null}
-              </View>
-              <Text style={{ fontSize: FONT.body, fontWeight: "700", color: r.amount < 0 ? t.paid : t.fg }}>{r.amount < 0 ? "− " : ""}{rs(Math.abs(r.amount))}</Text>
-            </View>
-          ))}
-          <View style={{ padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 2, borderColor: t.ink }}>
-            <Text style={{ fontSize: FONT.body, fontWeight: "700", color: t.fg }}>{stmt.siteName ? L.site_bal : L.closing}</Text>
-            <Text style={{ fontSize: FONT.big, fontWeight: "700", color: stmt.closing > 0 ? t.due : t.paid }}>{rupee(stmt.closing)}</Text>
-          </View>
-        </View>
+        <StatementCard stmt={stmt} emptyText={tr("st.empty")} />
 
         <Row wrap={false}><Btn label={tr("st.wa")} onPress={() => run(() => sendWhatsApp(party.phone, text), tr("st.waNote"))} /></Row>
         <Row wrap={false}>
@@ -92,6 +87,31 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
         </Row>
         {note ? <Text style={{ fontSize: FONT.small, color: t.muted }}>{note}</Text> : null}
         <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("st.hint")}</Text>
+
+        <Section title={tr("ln.title")}>
+          <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("ln.note")}</Text>
+          <Text style={{ fontSize: FONT.small, color: t.fg, fontWeight: "600" }}>{tr("ln.valid")}</Text>
+          <Row>{[7, 30, 90].map((n) => <Chip key={n} label={tr("ln.days", { n })} on={days === n} onPress={() => setDays(n)} />)}</Row>
+          <Row wrap={false}><Btn label={tr("ln.create")} onPress={makeLink} /></Row>
+          {lastUrl ? (
+            <View style={{ gap: 6 }}>
+              <Text selectable style={{ fontSize: FONT.small, color: t.accent }}>{lastUrl}</Text>
+              <Row><Chip label={tr("ln.copy")} onPress={() => run(() => shareText(lastUrl), tr("st.done"))} /></Row>
+              <Text style={{ fontSize: 13, color: t.muted }}>{tr("ln.lostNote")}</Text>
+            </View>
+          ) : null}
+          {links.length > 0 && <Text style={{ fontSize: FONT.small, color: t.muted, fontWeight: "700", marginTop: 6 }}>{tr("ln.existing")}</Text>}
+          {links.map((l) => {
+            const status = l.revoked_at ? "ln.revokedTag" : Date.parse(l.expires_at) <= Date.now() ? "ln.expiredTag" : "ln.activeTag";
+            return (
+              <View key={l.id} style={{ gap: 4, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: t.line, backgroundColor: t.surface }}>
+                <Text style={{ fontSize: FONT.small, color: status === "ln.activeTag" ? t.paid : t.muted, fontWeight: "700" }}>{tr(status)}</Text>
+                <Text style={{ fontSize: 13, color: t.muted }}>{tr("ln.line", { c: l.created_at.slice(0, 10), e: l.expires_at.slice(0, 10), n: l.view_count })}</Text>
+                {status === "ln.activeTag" && <Row><Chip label={tr("ln.revoke")} onPress={async () => { try { await revokeStatementLink(l.id); reloadLinks(); } catch (e: any) { setNote(fe(e)); } }} /></Row>}
+              </View>
+            );
+          })}
+        </Section>
       </ScrollView>
     </View>
   );

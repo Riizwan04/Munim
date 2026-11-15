@@ -1,4 +1,5 @@
-import { partyStats, getPreset, partyBalance, entryEffect, pendingAsEntries, type Entry, type EntryPayload, type MaterialRef, type PartyRef, type EntryType } from "@munim/ledger-core";
+import { partyStats, getPreset, partyBalance, entryEffect, pendingAsEntries, type Entry, type EntryPayload, type MaterialRef, type PartyRef, type EntryType, type PublicStatementPayload, type PublicError, isPublicError } from "@munim/ledger-core";
+import { Platform } from "react-native";
 import { localToday } from "./dates";
 import { getItems } from "./offline/outbox";
 import { withCache } from "./offline/cache";
@@ -263,3 +264,24 @@ export async function scanPagePhoto(base64: string, mime: string): Promise<strin
   if (r.error) throw new Error(r.error.message);
   return typeof r.data === "string" ? r.data : JSON.stringify(r.data);
 }
+
+// ───────── customer statement links ─────────
+/** Where customers open their link: the web address of the deployed app. */
+export const webOrigin = (): string => process.env.EXPO_PUBLIC_WEB_URL?.trim() || (Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "");
+export interface LinkRow { id: string; created_at: string; expires_at: string; revoked_at: string | null; view_count: number; last_viewed_at: string | null }
+export async function createStatementLink(partyId: string, days: number): Promise<{ id: string; token: string; expires_at: string }> {
+  return must(await supabase.rpc("create_statement_link", { p_party_id: partyId, p_days: days, p_pin_required: true })) as { id: string; token: string; expires_at: string };
+}
+export async function revokeStatementLink(id: string): Promise<void> { must(await supabase.rpc("revoke_statement_link", { p_id: id })); }
+export async function loadStatementLinks(partyId: string): Promise<LinkRow[]> {
+  const r = await supabase.from("statement_links").select("id,created_at,expires_at,revoked_at,view_count,last_viewed_at").eq("party_id", partyId).order("created_at", { ascending: false }).limit(20);
+  if (r.error) return []; // table not created yet (migration 0005)
+  return r.data as LinkRow[];
+}
+/** PUBLIC: no login. Returns the statement data, or an error code (invalid, locked, pin_required, wrong_pin). */
+export async function fetchPublicStatement(token: string, pin?: string): Promise<PublicStatementPayload | { error: PublicError }> {
+  const r = await supabase.rpc("get_statement", { p_token: token, p_pin: pin ?? null });
+  if (r.error) throw new Error(r.error.message);
+  return r.data as PublicStatementPayload | { error: PublicError };
+}
+export { isPublicError };

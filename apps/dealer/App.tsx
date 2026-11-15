@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import type { Session } from "@supabase/supabase-js";
@@ -12,6 +12,8 @@ import { Statement } from "./src/Statement";
 import { Settings } from "./src/Settings";
 import { Reports } from "./src/Reports";
 import { Import } from "./src/Import";
+import { PublicStatement } from "./src/PublicStatement";
+import { tokenFromHash } from "@munim/ledger-core";
 import { SyncBanner } from "./src/SyncBanner";
 import { SyncIssues } from "./src/SyncIssues";
 import { setCacheUser } from "./src/offline/cache";
@@ -147,6 +149,16 @@ function AppInner() {
 }
 
 export default function App() {
+  // A customer's link (#/s/<token>) shows only their statement: no login, no dealer app, no offline queue.
+  const read = () => (Platform.OS === "web" && typeof window !== "undefined" ? tokenFromHash(window.location.hash) : null);
+  const [token, setToken] = useState<string | null>(read);
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const f = () => setToken(read());
+    window.addEventListener("hashchange", f);
+    return () => window.removeEventListener("hashchange", f);
+  }, []);
+  if (token) return <SafeAreaProvider><SafeAreaView style={{ flex: 1 }}><PublicStatement token={token} /></SafeAreaView></SafeAreaProvider>;
   return (
     <I18nProvider>
       <AppInner />

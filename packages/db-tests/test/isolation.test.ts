@@ -173,3 +173,84 @@ run("Supabase: offline uploads are idempotent (migration 0004)", () => {
     expect((await B2.db.from("entries").select("id").eq("client_id", id)).data).toHaveLength(1);
   });
 });
+
+// Needs migration 0005. The public statement function must show ONE party's statement to someone holding the link and the code, and nothing else.
+run("Supabase: customer statement links (migration 0005)", () => {
+  let A: Tenant, B: Tenant;
+  let ready = false;
+  let secretParty: string;
+  const anon = () => createClient(URL_!, KEY!, { auth: { persistSession: false } });
+  beforeAll(async () => {
+    A = await tenant("link"); B = await tenant("linkB");
+    const probe = await A.db.rpc("create_statement_link", { p_party_id: A.party, p_days: 1 });
+    ready = !(probe.error && /could not find|does not exist|PGRST202/i.test(probe.error.message));
+    if (!ready) { console.warn("Migration 0005 is not applied yet: skipping the statement link checks."); return; }
+    const sp = await A.db.from("parties").insert({ business_id: A.biz, name: "Secret Other Party", phone: "+912222222222", opening_balance: R(777) }).select("id").single();
+    secretParty = sp.data!.id;
+    await A.db.rpc("save_entry", { p: salePayload(A, 10, 360) });          // visible entry of the linked party
+    const hidden = await A.db.rpc("save_entry", { p: { ...salePayload(A, 99, 999), party_id: secretParty, site_id: null } });
+    expect(hidden.error).toBeNull();
+    const cancelled = await A.db.rpc("save_entry", { p: salePayload(A, 7, 123) });
+    await A.db.rpc("cancel_entry", { p_entry_id: cancelled.data, p_reason: "test" });
+  }, 90_000);
+  const make = async (days = 7) => (await A.db.rpc("create_statement_link", { p_party_id: A.party, p_days: days })).data as { id: string; token: string; expires_at: string };
+
+  it("holding the link: asks for the code, wrong code refused, right code shows only this party", async () => {
+    if (!ready) return;
+    const l = await make();
+    const c = anon();
+    expect((await c.rpc("get_statement", { p_token: l.token })).data).toEqual({ error: "pin_required" });
+    expect((await c.rpc("get_statement", { p_token: l.token, p_pin: "0000" })).data).toEqual({ error: "wrong_pin" });
+    const ok = (await c.rpc("get_statement", { p_token: l.token, p_pin: "1111" })).data;
+    expect(ok.party.name).toBe(`Party link`);
+    expect(ok.business.name).toBe("Shop link");
+    const all = JSON.stringify(ok);
+    expect(all).not.toContain("Secret Other Party");       // other parties never appear
+    expect(all).not.toContain("999");                       // nor their amounts
+    expect(ok.entries).toHaveLength(1);                     // cancelled entry excluded
+    expect(ok.entries[0].amount).toBe(R(3600));
+    expect(Object.keys(ok.party).sort()).toEqual(["language", "name", "opening_balance"]);   // no phone number
+  });
+  it("five wrong codes lock the link, even for the right code", async () => {
+    if (!ready) return;
+    const l = await make();
+    const c = anon();
+    for (let i = 0; i < 4; i++) expect((await c.rpc("get_statement", { p_token: l.token, p_pin: "9999" })).data).toEqual({ error: "wrong_pin" });
+    expect((await c.rpc("get_statement", { p_token: l.token, p_pin: "9999" })).data).toEqual({ error: "locked" });
+    expect((await c.rpc("get_statement", { p_token: l.token, p_pin: "1111" })).data).toEqual({ error: "locked" });
+  });
+  it("made-up, empty and revoked tokens are all just 'invalid'", async () => {
+    if (!ready) return;
+    const c = anon();
+    expect((await c.rpc("get_statement", { p_token: "x".repeat(32), p_pin: "1111" })).data).toEqual({ error: "invalid" });
+    expect((await c.rpc("get_statement", { p_token: "" })).data).toEqual({ error: "invalid" });
+    const l = await make();
+    expect((await A.db.rpc("revoke_statement_link", { p_id: l.id })).error).toBeNull();
+    expect((await c.rpc("get_statement", { p_token: l.token, p_pin: "1111" })).data).toEqual({ error: "invalid" });
+  });
+  it("only the token's hash is stored, and views are counted", async () => {
+    if (!ready) return;
+    const l = await make();
+    await anon().rpc("get_statement", { p_token: l.token, p_pin: "1111" });
+    const row = (await A.db.from("statement_links").select("token_hash,view_count,last_viewed_at").eq("id", l.id).single()).data!;
+    expect(row.token_hash).toHaveLength(64);
+    expect(row.token_hash).not.toBe(l.token);
+    expect(row.view_count).toBe(1);
+    expect(row.last_viewed_at).not.toBeNull();
+  });
+  it("another business cannot create, revoke or even see these links; strangers cannot read the table", async () => {
+    if (!ready) return;
+    const l = await make();
+    expect((await B.db.rpc("create_statement_link", { p_party_id: A.party, p_days: 7 })).error).not.toBeNull();
+    expect((await B.db.rpc("revoke_statement_link", { p_id: l.id })).error).not.toBeNull();
+    expect((await B.db.from("statement_links").select("id").eq("id", l.id)).data).toEqual([]);
+    expect((await anon().from("statement_links").select("id")).data ?? []).toEqual([]);
+    expect((await anon().rpc("create_statement_link", { p_party_id: A.party, p_days: 7 })).error).not.toBeNull();
+    expect((await A.db.from("statement_links").update({ expires_at: "2099-01-01" }).eq("id", l.id)).error).not.toBeNull(); // no direct edits
+  });
+  it("days outside 1..365 are refused", async () => {
+    if (!ready) return;
+    expect((await A.db.rpc("create_statement_link", { p_party_id: A.party, p_days: 0 })).error).not.toBeNull();
+    expect((await A.db.rpc("create_statement_link", { p_party_id: A.party, p_days: 9999 })).error).not.toBeNull();
+  });
+});
