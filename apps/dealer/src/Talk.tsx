@@ -4,7 +4,7 @@ import type { ResolvedEntry, SpeakLang } from "@munim/ledger-core";
 import { createParty } from "./data";
 import { useI18n, LANGS, type Key } from "./i18n";
 import { rupee } from "./money";
-import { FONT, useTheme } from "./theme";
+import { FONT, HEAD, useTheme } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 import { useConversation, type Orb } from "./voice/useConversation";
 
@@ -34,7 +34,7 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
     return () => a.stop();
   }, [st.orb, pulse]);
 
-  const orbColor: Record<Orb, string> = { loading: t.muted, idle: t.muted, speaking: "#c27c0e", listening: t.paid, thinking: t.accent };
+  const orbColor: Record<Orb, string> = { loading: t.muted, idle: t.muted, speaking: t.saffron, listening: t.paid, thinking: t.accent };
   const label: Record<Orb, Key> = { loading: "talk.loading", idle: "talk.paused", speaking: "talk.speaking", listening: "talk.listening", thinking: "talk.thinking" };
   const card = st.view.card;
   const problemText = st.problem === "denied" ? tr("talk.noMic") : st.problem === "unsupported" ? tr("talk.noSupport") : st.problem === "network" ? tr("talk.needNet")
@@ -44,7 +44,7 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderBottomWidth: 2, borderColor: t.ink }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("talk.title")}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("talk.title")}</Text>
         <Pressable onPress={() => { c.stop(); onClose(); }} accessibilityRole="button" style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}>
           <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>{tr("add.closeX")}</Text>
         </Pressable>
@@ -55,31 +55,34 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
           <Text style={{ fontSize: 13, color: t.muted }}>{tr("talk.langNote")}</Text>
         </Section>
 
-        <View style={{ alignItems: "center", gap: 10, paddingVertical: 6 }}>
-          <Pressable onPress={() => void c.tapMic()} accessibilityRole="button" accessibilityLabel={tr("talk.tapMic")} testID="orb">
-            <Animated.View style={{ width: 132, height: 132, borderRadius: 66, backgroundColor: orbColor[st.orb], alignItems: "center", justifyContent: "center", transform: [{ scale: pulse }], opacity: st.orb === "idle" ? 0.85 : 1 }}>
-              {st.orb === "loading" ? <ActivityIndicator color="#fff" /> : <Text style={{ fontSize: 54 }}>{st.orb === "listening" ? "🎙" : st.orb === "speaking" ? "🔊" : st.orb === "thinking" ? "…" : "🎤"}</Text>}
-            </Animated.View>
-          </Pressable>
-          <Text style={{ fontSize: FONT.small, fontWeight: "700", color: orbColor[st.orb], textTransform: "uppercase", letterSpacing: 0.8 }}>{tr(label[st.orb])}</Text>
+        <View style={{ alignItems: "center", gap: 10, paddingVertical: 14 }}>
+          <View style={{ width: 150, height: 150, alignItems: "center", justifyContent: "center" }}>
+            {[0, 700, 1400].map((d) => <Ripple key={d} delay={d} color={orbColor[st.orb]} active={st.orb === "listening" || st.orb === "speaking"} />)}
+            <Pressable onPress={() => void c.tapMic()} accessibilityRole="button" accessibilityLabel={tr("talk.tapMic")} testID="orb">
+              <Animated.View style={{ width: 118, height: 118, borderRadius: 59, backgroundColor: orbColor[st.orb], alignItems: "center", justifyContent: "center", transform: [{ scale: pulse }], opacity: st.orb === "idle" ? 0.88 : 1, borderWidth: 4, borderColor: t.bg, shadowColor: orbColor[st.orb], shadowOpacity: 0.5, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
+                {st.orb === "loading" ? <ActivityIndicator color="#fff" /> : <Text style={{ fontSize: 50 }}>{st.orb === "listening" ? "🎙" : st.orb === "speaking" ? "🔊" : st.orb === "thinking" ? "…" : "🎤"}</Text>}
+              </Animated.View>
+            </Pressable>
+          </View>
+          <Text style={{ fontSize: FONT.small - 1, fontWeight: "800", color: orbColor[st.orb], textTransform: "uppercase", letterSpacing: 1.4 }}>{tr(label[st.orb])}</Text>
         </View>
 
-        {st.caption ? <Text style={{ fontSize: FONT.title - 2, fontWeight: "600", color: t.fg, textAlign: "center", lineHeight: 32 }} testID="caption">{st.caption}</Text> : null}
+        {st.caption ? <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 2, color: t.fg, textAlign: "center", lineHeight: 32 }} testID="caption">{st.caption}</Text> : null}
         {problemText ? <Text style={{ fontSize: FONT.body, color: t.due, textAlign: "center" }} testID="problem">{problemText}</Text> : null}
         {st.error ? <Text style={{ fontSize: FONT.body, color: t.due, textAlign: "center" }}>{st.error}</Text> : null}
 
         {showHeard && st.heard ? <Text style={{ fontSize: FONT.small, color: t.muted, textAlign: "center" }}>{tr("talk.heard")}: “{st.heard}”</Text> : null}
 
         {card ? (
-          <View style={{ gap: 8, padding: 14, borderRadius: 14, borderWidth: 2, borderColor: t.ink, backgroundColor: t.surface }} testID="card">
+          <View style={{ gap: 8, padding: 14, borderRadius: 16, borderWidth: 1.5, borderColor: t.ink, backgroundColor: t.surface }} testID="card">
             {st.view.position && st.view.position.n > 1 ? <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("talk.entryOf", { i: st.view.position.i, n: st.view.position.n })}</Text> : null}
-            <Text style={{ fontSize: FONT.title - 2, fontWeight: "700", color: t.ink }}>{card.party}{card.site ? ` · ${card.site}` : ""}</Text>
+            <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 2, color: t.ink }}>{card.party}{card.site ? ` · ${card.site}` : ""}</Text>
             <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr(`type.${card.type}` as Key)}{card.paymentMode ? ` · ${tr(`mode.${card.paymentMode}` as Key)}` : ""}</Text>
             {card.lines.map((l, i) => <Text key={i} style={{ fontSize: FONT.body + 1, color: t.fg }}>{ta("rv.line", { name: l.name, qty: l.qty / 1000, unit: l.unit, rate: rupee(l.rate), total: rupee(l.total) })}</Text>)}
             <View style={{ borderTopWidth: 2, borderColor: t.ink, paddingTop: 8, gap: 2 }}>
               <Text style={{ fontSize: FONT.body, color: t.muted }}>{ta("rv.entryTotal", { v: rupee(card.total) })}</Text>
               <Text style={{ fontSize: FONT.body, color: t.muted }}>{tr("talk.old")}: {rupee(card.oldBalance)}</Text>
-              <Text style={{ fontSize: FONT.big, fontWeight: "700", color: card.newBalance > 0 ? t.due : t.paid }}>{tr("talk.new")}: {rupee(card.newBalance)}</Text>
+              <Text style={{ fontFamily: HEAD, fontSize: FONT.big, color: card.newBalance > 0 ? t.due : t.paid }}>{tr("talk.new")}: {rupee(card.newBalance)}</Text>
             </View>
             {card.warnings.includes("rate") ? <Text style={{ color: t.due, fontWeight: "600", fontSize: FONT.small }}>⚠ {tr("talk.warnRate")}</Text> : null}
             {card.warnings.includes("credit") ? <Text style={{ color: t.due, fontWeight: "600", fontSize: FONT.small }}>⚠ {tr("talk.warnCredit")}</Text> : null}
@@ -127,4 +130,16 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
       </ScrollView>
     </View>
   );
+}
+
+/** A ring that grows and fades around the orb while Munim speaks or listens. */
+function Ripple({ color, delay, active }: { color: string; delay: number; active: boolean }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!active) { v.setValue(0); return; }
+    const a = Animated.loop(Animated.sequence([Animated.delay(delay), Animated.timing(v, { toValue: 1, duration: 2100, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== "web" })]));
+    a.start();
+    return () => a.stop();
+  }, [active, delay, v]);
+  return <Animated.View pointerEvents="none" style={{ position: "absolute", width: 118, height: 118, borderRadius: 59, borderWidth: 2, borderColor: color, opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }), transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.28] }) }] }} />;
 }

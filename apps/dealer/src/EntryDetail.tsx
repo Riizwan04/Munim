@@ -4,7 +4,7 @@ import { cancelEntry, loadEntry, type EntryDetail as Detail, type PartyRow } fro
 import { rupee } from "./money";
 import { useI18n } from "./i18n";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Field, Row } from "./ui";
 import { entryMessage, lineText, type Lang } from "@munim/ledger-core";
 import { sendWhatsApp } from "./share";
@@ -24,10 +24,10 @@ export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { ent
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <Text onPress={onBack} accessibilityRole="button" style={{ padding: 14, fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ {party.name}</Text>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr(`type.${d.type}` as never)} · {d.date}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr(`type.${d.type}` as never)} · {d.date}</Text>
         {d.siteName ? <Text style={{ fontSize: FONT.body, color: t.muted }}>{tr("detail.site", { name: d.siteName ?? "" })}</Text> : null}
         {d.lines.map((l, i) => <Text key={i} style={{ fontSize: FONT.body + 1, color: t.fg }}>{l.name}: {l.qty / 1000} {l.unit} × {rupee(l.rate)} = <Text style={{ fontWeight: "700" }}>{rupee(l.total)}</Text></Text>)}
-        <Text style={{ fontSize: FONT.big, fontWeight: "700", color: d.type === "payment" ? t.paid : t.due }}>{rupee(d.amount)}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.big, color: d.type === "payment" ? t.paid : t.due }}>{rupee(d.amount)}</Text>
         <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("detail.version", { v: d.version, status: tr(`status.${d.status}` as never) })}</Text>
         {err ? <Text style={{ color: t.due }}>{err}</Text> : null}
         {d.status === "active" && !cancelling && (

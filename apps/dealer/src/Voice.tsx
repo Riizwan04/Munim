@@ -5,7 +5,7 @@ import { loadUnderstandContext } from "./data";
 import { supabase } from "./supabase";
 import { useI18n } from "./i18n";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Row } from "./ui";
 
 
@@ -34,7 +34,7 @@ export function Voice({ onResolved, onCancel }: { onResolved: (entries: Resolved
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderBottomWidth: 2, borderColor: t.ink }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{ta("voice.title")}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{ta("voice.title")}</Text>
         <Pressable onPress={onCancel} accessibilityRole="button" style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}>
           <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>{tr("add.closeX")}</Text>
         </Pressable>

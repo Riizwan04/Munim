@@ -4,7 +4,7 @@ import { formatINR } from "@munim/ledger-core";
 import type { PartyRow } from "./data";
 import { useI18n, type Key } from "./i18n";
 import { discardItem, retryItem, syncNow, useOutbox } from "./offline/outbox";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Row } from "./ui";
 
 /** Entries stored on this phone that are not on the server yet, or that the server refused. Nothing here is lost until the dealer discards it. */
@@ -16,7 +16,7 @@ export function SyncIssues({ parties, onBack }: { parties: PartyRow[]; onBack: (
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, gap: 14 }}>
       <Text onPress={onBack} accessibilityRole="button" style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>{tr("sync.back")}</Text>
-      <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("sync.title")}</Text>
+      <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("sync.title")}</Text>
       <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("sync.note")}</Text>
       {items.length === 0 ? <Text style={{ fontSize: FONT.body, color: t.paid, fontWeight: "600" }}>{tr("sync.empty")}</Text> : (
         <Row wrap={false}><Btn label={tr("sync.retryAll")} onPress={() => void syncNow()} /></Row>

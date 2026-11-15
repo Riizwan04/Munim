@@ -7,7 +7,7 @@ import { LANGS, translate, type Key } from "./i18n";
 import { rupee } from "./money";
 import { sharePdf } from "./share";
 import { StatementCard } from "./StatementCard";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Chip, Row, Section } from "./ui";
 
 type Phase = "loading" | "pin" | "ready" | "invalid" | "locked" | "error";
@@ -71,12 +71,12 @@ export function PublicStatement({ token }: { token: string }) {
 
   if (phase === "loading") return <Shell><ActivityIndicator style={{ marginTop: 60 }} /><Text style={{ textAlign: "center", color: t.muted, fontSize: FONT.body }}>{T("ps.loading")}</Text></Shell>;
   if (phase === "invalid" || phase === "locked" || phase === "error") return (
-    <Shell>{langChips}<Text style={{ fontSize: FONT.title - 2, fontWeight: "700", color: t.due }}>{T(phase === "locked" ? "ps.locked" : phase === "error" ? "ps.error" : "ps.invalid")}</Text></Shell>
+    <Shell>{langChips}<Text style={{ fontFamily: HEAD, fontSize: FONT.title - 2, color: t.due }}>{T(phase === "locked" ? "ps.locked" : phase === "error" ? "ps.error" : "ps.invalid")}</Text></Shell>
   );
   if (phase === "pin") return (
     <Shell>
       {langChips}
-      <Text style={{ fontSize: FONT.title - 2, fontWeight: "700", color: t.ink }}>{T("ps.pinTitle")}</Text>
+      <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 2, color: t.ink }}>{T("ps.pinTitle")}</Text>
       <TextInput nativeID="ps-pin" value={pin} onChangeText={(v) => { setPin(v.replace(/\D/g, "").slice(0, 4)); setWrong(false); }} keyboardType="number-pad" maxLength={4} placeholder={T("ps.pinPh")} placeholderTextColor={t.muted}
         onSubmitEditing={() => pin.length === 4 && load(pin)} style={{ borderWidth: 2, borderColor: wrong ? t.due : t.line, backgroundColor: t.surface, color: t.fg, borderRadius: 12, padding: 16, fontSize: 28, letterSpacing: 8, textAlign: "center" }} />
       {wrong ? <Text style={{ color: t.due, fontSize: FONT.body, fontWeight: "600" }}>{T("ps.wrongPin")}</Text> : null}
@@ -90,11 +90,11 @@ export function PublicStatement({ token }: { token: string }) {
       {langChips}
       <View style={{ gap: 4 }}>
         <Text style={{ fontSize: FONT.small, color: t.muted }}>{T("ps.from", { business: d.business.name })}</Text>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{T("ps.balanceOf", { name: d.party.name })}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{T("ps.balanceOf", { name: d.party.name })}</Text>
       </View>
       <View style={{ gap: 2 }}>
         <Text style={{ fontSize: FONT.small, color: t.muted }}>{T("ps.due")}</Text>
-        <Text style={{ fontSize: 40, fontWeight: "700", color: stmt!.closing > 0 ? t.due : t.paid }}>{rupee(stmt!.closing)}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: 40, color: stmt!.closing > 0 ? t.due : t.paid }}>{rupee(stmt!.closing)}</Text>
       </View>
       <Section title={T("st.period")}>
         <Row>{([["month", "st.month"], ["30", "st.30"], ["all", "st.all"]] as [Period, Key][]).map(([k, label]) => <Chip key={k} label={T(label)} on={period === k} onPress={() => setPeriod(k)} />)}</Row>

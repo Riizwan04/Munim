@@ -7,7 +7,7 @@ import { useI18n, type Key } from "./i18n";
 import { rs, rupee } from "./money";
 import { shareFile, sharePdf, shareText } from "./share";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Chip, Row, Section } from "./ui";
 
 type Period = "month" | "last" | "30" | "all";
@@ -49,7 +49,7 @@ export function Reports({ onImport }: { onImport: () => void }) {
 
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, gap: 18 }}>
-      <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("rp.title")}</Text>
+      <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("rp.title")}</Text>
       <Section title={tr("rp.period")}>
         <Row>
           {([["month", "rp.thisMonth"], ["last", "rp.lastMonth"], ["30", "rp.last30"], ["all", "rp.all"]] as [Period, Key][]).map(([k, label]) => <Chip key={k} label={tr(label)} on={period === k} onPress={() => setPeriod(k)} />)}

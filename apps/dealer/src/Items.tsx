@@ -4,7 +4,7 @@ import { COMMON_UNITS } from "@munim/ledger-core";
 import { loadMaterialsFull, saveMaterial, type MaterialFull } from "./data";
 import { useI18n } from "./i18n";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 
 /** Items master (FR-13): brands are separate items under a category; each item lists the units it is sold in. */
@@ -23,7 +23,7 @@ export function Items({ businessId }: { businessId: string }) {
     const cats = [...new Set(items.map((i) => i.category).filter(Boolean))] as string[];
     return (
       <View style={{ flex: 1, backgroundColor: t.bg, padding: 16, gap: 16 }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{edit.id ? tr("it.editTitle") : tr("it.newTitle")}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{edit.id ? tr("it.editTitle") : tr("it.newTitle")}</Text>
         <Field label={tr("it.name")} nativeID="it-name" value={edit.name} onChangeText={(v) => setEdit({ ...edit, name: v })} />
         <Field label={tr("it.category")} nativeID="it-cat" value={edit.category} onChangeText={(v) => setEdit({ ...edit, category: v })} />
         {cats.length > 0 && <Row>{cats.map((c) => <Chip key={c} label={c} on={edit.category === c} onPress={() => setEdit({ ...edit, category: c })} />)}</Row>}
@@ -47,7 +47,7 @@ export function Items({ businessId }: { businessId: string }) {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 2, borderColor: t.ink }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("it.title")}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("it.title")}</Text>
         <Pressable onPress={() => setEdit({ name: "", category: "", units: [], local: "" })} accessibilityRole="button" style={{ paddingHorizontal: 18, minHeight: 48, justifyContent: "center", borderRadius: 24, backgroundColor: t.paid }}>
           <Text style={{ fontSize: FONT.body, color: "#fff", fontWeight: "700" }}>{tr("it.new")}</Text>
         </Pressable>

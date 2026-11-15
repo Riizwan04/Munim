@@ -4,7 +4,7 @@ import { parseRupees } from "@munim/ledger-core";
 import { updateParty, type PartyRow } from "./data";
 import { useI18n } from "./i18n";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 
 const LANGS = [{ k: "hi", l: "Hindi" }, { k: "mr", l: "Marathi" }, { k: "en", l: "English" }];
@@ -26,7 +26,7 @@ export function PartyEdit({ party, onBack, onSaved }: { party: PartyRow; onBack:
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, gap: 16 }} keyboardShouldPersistTaps="handled">
       <Text onPress={onBack} style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>{tr("pe.back")}</Text>
-      <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("pe.title")}</Text>
+      <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("pe.title")}</Text>
       <Field label={tr("pe.name")} nativeID="pe-name" value={name} onChangeText={setName} />
       <Field label={tr("pe.phone")} nativeID="pe-phone" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
       <Field label={tr("pe.nick")} nativeID="pe-nick" value={nick} onChangeText={setNick} placeholder="Santosh bhai, Naik mistri" />

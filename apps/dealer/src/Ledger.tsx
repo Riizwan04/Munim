@@ -4,7 +4,8 @@ import { loadLedger, type LedgerRow, type PartyRow } from "./data";
 import { rs, rupee } from "./money";
 import { useI18n } from "./i18n";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, HEAD, useTheme } from "./theme";
+import { Avatar } from "./Logo";
 
 // Notebook layout (Layout A): Date | Item | Qty | Rate | Amount | Site — same as the paper khata, plus Rate.
 // Fits a phone with no sideways scroll: Item takes the leftover width; the site shows as a small line under the item.
@@ -22,37 +23,38 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement,
   const txt = (color: string, bold = false, size: number = FONT.body) => ({ color, fontSize: size, fontWeight: bold ? ("700" as const) : ("400" as const), fontVariant: ["tabular-nums" as const] });
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Pressable onPress={onBack} accessibilityRole="button" style={{ padding: 14, minHeight: 52, justifyContent: "center" }}>
-          <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>{tr("ledger.parties")}</Text>
+      <View style={{ backgroundColor: t.hero, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 16, borderBottomLeftRadius: 22, borderBottomRightRadius: 22, gap: 8 }}>
+        <Pressable onPress={onBack} accessibilityRole="button" style={{ minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }}>
+          <Text style={{ fontSize: FONT.body, color: t.heroFg, fontWeight: "700", opacity: 0.95 }}>{tr("ledger.parties")}</Text>
         </Pressable>
-        <View style={{ flexDirection: "row", gap: 6, margin: 8 }}>
-          {party.balance > 0 && (
-            <Pressable onPress={onRemind} accessibilityRole="button" style={{ paddingHorizontal: 12, minHeight: 48, justifyContent: "center", borderRadius: 24, borderWidth: 2, borderColor: t.due }}>
-              <Text style={{ fontSize: FONT.small + 1, color: t.due, fontWeight: "700" }}>{tr("ledger.remind")}</Text>
-            </Pressable>
-          )}
-          <Pressable onPress={onStatement} accessibilityRole="button" style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: "center", borderRadius: 24, borderWidth: 2, borderColor: t.accent }}>
-            <Text style={{ fontSize: FONT.small + 1, color: t.accent, fontWeight: "700" }}>{tr("ledger.statement")}</Text>
-          </Pressable>
-          <Pressable onPress={onAdd} accessibilityRole="button" style={{ paddingHorizontal: 14, minHeight: 48, justifyContent: "center", borderRadius: 24, backgroundColor: t.paid }}>
-            <Text style={{ fontSize: FONT.small + 1, color: "#fff", fontWeight: "700" }}>{tr("home.entry")}</Text>
-          </Pressable>
+        <Pressable onPress={onEditParty} accessibilityRole="button" style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <Avatar name={party.name} size={50} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 1, color: t.heroFg }} numberOfLines={1}>{party.name}</Text>
+            <Text style={{ fontSize: 13, color: t.heroFg, opacity: 0.85 }}>{tr("ledger.editParty")}</Text>
+          </View>
+        </Pressable>
+        <View>
+          <Text style={{ fontSize: 13, color: t.heroFg, opacity: 0.85 }}>{tr("ledger.balanceDue")}</Text>
+          <Text style={{ fontFamily: HEAD, fontSize: 36, lineHeight: 42, color: t.heroFg }} testID="ledger-total">{rupee(total)}</Text>
         </View>
       </View>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 2, borderColor: t.ink }}>
-        <Pressable onPress={onEditParty} accessibilityRole="button" style={{ flexShrink: 1 }}>
-          <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{party.name}</Text>
-          <Text style={{ fontSize: 13, color: t.accent }}>{tr("ledger.editParty")}</Text>
+      <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 4 }}>
+        {party.balance > 0 && (
+          <Pressable onPress={onRemind} accessibilityRole="button" style={{ flex: 1, minHeight: 46, justifyContent: "center", alignItems: "center", borderRadius: 23, borderWidth: 1.5, borderColor: t.due }}>
+            <Text style={{ fontSize: FONT.small, color: t.due, fontWeight: "700" }}>{tr("ledger.remind")}</Text>
+          </Pressable>
+        )}
+        <Pressable onPress={onStatement} accessibilityRole="button" style={{ flex: 1, minHeight: 46, justifyContent: "center", alignItems: "center", borderRadius: 23, borderWidth: 1.5, borderColor: t.accent }}>
+          <Text style={{ fontSize: FONT.small, color: t.accent, fontWeight: "700" }}>{tr("ledger.statement")}</Text>
         </Pressable>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={{ fontSize: 14, color: t.muted }}>{tr("ledger.balanceDue")}</Text>
-          <Text style={{ fontSize: FONT.big, fontWeight: "700", color: t.due }}>{rupee(total)}</Text>
-        </View>
+        <Pressable onPress={onAdd} accessibilityRole="button" style={{ flex: 1, minHeight: 46, justifyContent: "center", alignItems: "center", borderRadius: 23, backgroundColor: t.paid }}>
+          <Text style={{ fontFamily: HEAD, fontSize: FONT.small, color: t.bg === "#12141f" ? "#06130a" : "#fff" }}>{tr("home.entry")}</Text>
+        </Pressable>
       </View>
       {err ? <Text style={{ color: t.due, padding: 16 }}>{err}</Text> : !rows ? <ActivityIndicator style={{ marginTop: 40 }} /> : (
-        <ScrollView>
-          <View style={{ backgroundColor: t.surface }}>
+        <ScrollView contentContainerStyle={{ padding: 12 }}>
+          <View style={{ backgroundColor: t.surface, borderRadius: 14, overflow: "hidden", borderWidth: 1, borderColor: t.line }}>
             <View style={{ flexDirection: "row", borderBottomWidth: 2, borderColor: t.ink }}>
               <View style={cell(W.date)}><Text style={txt(t.muted, true, 12)}>{tr("col.date")}</Text></View>
               <View style={cell(undefined)}><Text style={txt(t.muted, true, 12)}>{tr("col.item")}</Text></View>

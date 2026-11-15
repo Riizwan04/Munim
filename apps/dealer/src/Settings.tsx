@@ -8,12 +8,13 @@ import { useOutbox } from "./offline/outbox";
 import { useReachable } from "./offline/net";
 import { shareText } from "./share";
 import { requestSignOut } from "./offline/signout";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, useThemeMode, HEAD } from "./theme";
 import { Btn, Chip, Row, Section } from "./ui";
 
 /** App language (screens) and assistant language (its questions and read-back) are chosen separately (PRD FR-02). */
 export function Settings({ onBack }: { onBack: () => void }) {
   const t = useTheme();
+  const { mode, setMode } = useThemeMode();
   const { tr, ui, asst, setUi, setAsst } = useI18n();
   const [note, setNote] = useState("");
   const online = useReachable();
@@ -22,7 +23,10 @@ export function Settings({ onBack }: { onBack: () => void }) {
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, gap: 20 }}>
       <Text onPress={onBack} accessibilityRole="button" style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ {tr("common.back")}</Text>
-      <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("set.title")}</Text>
+      <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("set.title")}</Text>
+      <Section title={tr("theme.title")}>
+        <Row>{(["system", "light", "dark"] as const).map((m) => <Chip key={m} label={tr(`theme.${m}` as const)} on={mode === m} onPress={() => setMode(m)} />)}</Row>
+      </Section>
       <Section title={tr("set.appLang")}>
         <Row>{LANGS.map((l) => <Chip key={l.k} label={l.label} on={ui === l.k} onPress={() => setUi(l.k)} />)}</Row>
       </Section>

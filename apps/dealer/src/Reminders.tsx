@@ -6,7 +6,7 @@ import { rupee } from "./money";
 import { sendWhatsApp } from "./share";
 import { useI18n } from "./i18n";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Chip, Row } from "./ui";
 
 const daysAgo = (ts: string | undefined, tr: (k: any, v?: any) => string) => {
@@ -48,7 +48,7 @@ export function Reminders({ businessId, business, parties, only, onClose }: {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ padding: 16, gap: 6, borderBottomWidth: 2, borderColor: t.ink }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("rem.title")}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("rem.title")}</Text>
         <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("rem.sub")}</Text>
       </View>
       <View style={{ flexDirection: "row", gap: 8, padding: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -105,7 +105,7 @@ function Queue({ business, businessId, people, onDone, onBack }: { business: str
 
   if (!p) return (
     <View style={{ flex: 1, backgroundColor: t.bg, padding: 20, gap: 16, justifyContent: "center" }}>
-      <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("rem.doneTitle")}</Text>
+      <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("rem.doneTitle")}</Text>
       <Text style={{ fontSize: FONT.body, color: t.fg }}>{tr("rem.doneBody", { a: sent.length, b: skipped })}</Text>
       {logged.length < sent.length ? <Text style={{ fontSize: FONT.small, color: t.due }}>{tr("rem.logFail", { n: sent.length - logged.length })}</Text> : null}
       <Row wrap={false}><Btn label={tr("common.ok")} onPress={() => onDone(logged)} /></Row>
@@ -116,7 +116,7 @@ function Queue({ business, businessId, people, onDone, onBack }: { business: str
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
       <Text onPress={onBack} style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ {tr("common.back")}</Text>
       <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("rem.of", { i: i + 1, n: people.length })}</Text>
-      <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{p.name}</Text>
+      <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{p.name}</Text>
       <Text style={{ fontSize: FONT.body, color: t.due, fontWeight: "700" }}>{tr("rem.due", { v: rupee(p.balance), phone: p.phone })}</Text>
       <Row>{([["hi", "Hindi"], ["mr", "Marathi"], ["en", "English"]] as const).map(([k, l]) => <Chip key={k} label={l} on={lang === k} onPress={() => { setLang(k); setText(make(p, k)); }} />)}</Row>
       <TextInput nativeID="rem-text" multiline value={text} onChangeText={setText}

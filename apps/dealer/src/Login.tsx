@@ -1,3 +1,4 @@
+import { LogoWord } from "./Logo";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { isValidEmail } from "@munim/ledger-core";
@@ -34,7 +35,7 @@ export function Login() {
   }
   return (
     <View style={{ flex: 1, justifyContent: "center", gap: 14, padding: 24, backgroundColor: t.bg }}>
-      <Text style={{ fontSize: 34, fontWeight: "700", color: t.ink }}>Munim</Text>
+      <LogoWord />
       <Text style={{ fontSize: FONT.body, color: t.muted }}>{tr("login.tagline")}</Text>
       <TextInput nativeID="email" style={input} placeholder={tr("login.email")} placeholderTextColor={t.muted} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
       <TextInput nativeID="password" style={input} placeholder={tr("login.password")} placeholderTextColor={t.muted} secureTextEntry value={password} onChangeText={setPassword} />

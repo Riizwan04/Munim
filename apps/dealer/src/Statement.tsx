@@ -7,7 +7,7 @@ import { StatementCard } from "./StatementCard";
 import { sendWhatsApp, shareText, sharePdf } from "./share";
 import { useI18n } from "./i18n";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Chip, Row, Section } from "./ui";
 
 type Period = "month" | "30" | "all";
@@ -61,7 +61,7 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <Text onPress={onBack} accessibilityRole="button" style={{ padding: 14, fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ {party.name}</Text>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{tr("st.title")}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("st.title")}</Text>
         <Section title={tr("st.period")}>
           <Row>
             <Chip label={tr("st.month")} on={period === "month"} onPress={() => setPeriod("month")} />

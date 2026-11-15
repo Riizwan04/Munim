@@ -1,7 +1,7 @@
 import { Text, View } from "react-native";
 import { labels, type Statement } from "@munim/ledger-core";
 import { rs, rupee } from "./money";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 
 /** The statement table: opening balance, one row per entry, closing balance. Used by the dealer and on the customer's page. */
 export function StatementCard({ stmt, emptyText }: { stmt: Statement; emptyText: string }) {
@@ -26,7 +26,7 @@ export function StatementCard({ stmt, emptyText }: { stmt: Statement; emptyText:
       ))}
       <View style={{ padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 2, borderColor: t.ink }}>
         <Text style={{ fontSize: FONT.body, fontWeight: "700", color: t.fg }}>{stmt.siteName ? L.site_bal : L.closing}</Text>
-        <Text style={{ fontSize: FONT.big, fontWeight: "700", color: stmt.closing > 0 ? t.due : t.paid }}>{rupee(stmt.closing)}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.big, color: stmt.closing > 0 ? t.due : t.paid }}>{rupee(stmt.closing)}</Text>
       </View>
     </View>
   );

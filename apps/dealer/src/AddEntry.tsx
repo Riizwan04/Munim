@@ -11,7 +11,7 @@ import { fe } from "./errors";
 import { discardItem, enqueueEntry, getItems, syncNow } from "./offline/outbox";
 import { useReachable } from "./offline/net";
 import { useI18n, type Key } from "./i18n";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 
 const TYPES: EntryType[] = ["sale", "payment", "charge", "discount"];
@@ -142,7 +142,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderBottomWidth: 2, borderColor: t.ink }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.ink }}>{title}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{title}</Text>
         <Pressable onPress={onCancel} accessibilityRole="button" style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}>
           <Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>{tr("add.closeX")}</Text>
         </Pressable>
@@ -271,7 +271,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
         </>) : (
           // ───────── Review: read-back before saving (FR-25, FR-40) ─────────
           <View style={{ gap: 14 }}>
-            <Text style={{ fontSize: FONT.title, fontWeight: "700", color: t.fg }}>{party!.name}{siteId ? ` · ${ctx.sites.find((s) => s.id === siteId)?.name}` : ""}</Text>
+            <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.fg }}>{party!.name}{siteId ? ` · ${ctx.sites.find((s) => s.id === siteId)?.name}` : ""}</Text>
             <Text style={{ fontSize: FONT.small, color: t.muted }}>{date}</Text>
             {draft!.payload!.lines.map((l, i) => {
               const m = materials.find((x) => x.id === l.material_id);
@@ -281,7 +281,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
             <View style={{ borderTopWidth: 2, borderColor: t.ink, paddingTop: 12, gap: 4 }}>
               <Text style={{ fontSize: FONT.body, color: t.muted }}>{ta("rv.entryTotal", { v: rupee(draft!.total) })}</Text>
               <Text style={{ fontSize: FONT.body, color: t.muted }}>{ta("rv.oldBalance", { v: rupee(preview!.before) })}</Text>
-              <Text style={{ fontSize: FONT.big, fontWeight: "700", color: preview!.after > 0 ? t.due : t.paid }}>{ta("rv.newBalance", { v: rupee(preview!.after) })}</Text>
+              <Text style={{ fontFamily: HEAD, fontSize: FONT.big, color: preview!.after > 0 ? t.due : t.paid }}>{ta("rv.newBalance", { v: rupee(preview!.after) })}</Text>
             </View>
             {warnings.map((w) => <Text key={w} style={{ color: t.due, fontSize: FONT.body, fontWeight: "600" }}>⚠ {w}</Text>)}
             {editingId && <Text style={{ color: t.muted, fontSize: FONT.small }}>{ta("rv.reason", { r: reason })}</Text>}

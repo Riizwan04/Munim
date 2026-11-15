@@ -285,5 +285,15 @@ export const en = {
   "talk.warnRate": "Rate is very different from last time",
   "talk.warnCredit": "Over the credit limit",
   "talk.langNote": "Munim understands Hindi and English mixed in one sentence.",
+  "tag.overdue": "Overdue",
+  "tag.due": "Due",
+  "tag.clear": "Clear",
+  "tab.talk": "Talk",
+  "home.search": "Search a party",
+  "home.hello": "Namaste",
+  "theme.title": "Appearance",
+  "theme.system": "Same as phone",
+  "theme.light": "Light",
+  "theme.dark": "Dark",
 } as const;
 export type Key = keyof typeof en;

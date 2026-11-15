@@ -7,7 +7,7 @@ import { localToday } from "./dates";
 import { useI18n, type Key } from "./i18n";
 import { rupee } from "./money";
 import { fe } from "./errors";
-import { FONT, useTheme } from "./theme";
+import { FONT, useTheme, HEAD } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 
 const SCAN_ON = process.env.EXPO_PUBLIC_SCAN_FUNCTION === "1";
@@ -77,7 +77,7 @@ export function Import({ businessId, parties, onClose, onDone }: { businessId: s
 
   const head = (
     <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderBottomWidth: 2, borderColor: t.ink }}>
-      <Text style={{ fontSize: FONT.title - 2, fontWeight: "700", color: t.ink, flexShrink: 1 }}>{tr("im.title")}</Text>
+      <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 2, color: t.ink, flexShrink: 1 }}>{tr("im.title")}</Text>
       <Pressable onPress={onClose} accessibilityRole="button" style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}><Text style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>{tr("im.back")}</Text></Pressable>
     </View>
   );
@@ -101,7 +101,7 @@ export function Import({ businessId, parties, onClose, onDone }: { businessId: s
   if (step === "source") return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>{head}
       <ScrollView contentContainerStyle={body} keyboardShouldPersistTaps="handled">
-        <Text style={{ fontSize: FONT.title - 4, fontWeight: "700", color: t.fg }}>{party?.name ?? newParty?.name}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 4, color: t.fg }}>{party?.name ?? newParty?.name}</Text>
         <Section title={tr("im.how")}>
           <Row wrap={false}><Btn label={busy ? tr("im.scanning") : tr("im.scan")} disabled={!SCAN_ON || busy} onPress={scan} /></Row>
           {!SCAN_ON && <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("im.scanOff")}</Text>}
@@ -123,7 +123,7 @@ export function Import({ businessId, parties, onClose, onDone }: { businessId: s
   if (step === "done") return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>{head}
       <View style={{ padding: 20, gap: 16 }}>
-        <Text style={{ fontSize: FONT.title, fontWeight: "700", color: result.error ? t.due : t.paid }}>{tr("im.done", { n: result.ok })}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: result.error ? t.due : t.paid }}>{tr("im.done", { n: result.ok })}</Text>
         {result.error ? <Text style={{ fontSize: FONT.body, color: t.due }}>{tr("im.failed", { n: result.failedAt ?? 0, err: result.error })}</Text> : null}
         <Row wrap={false}><Btn label={tr("im.reportsLink")} onPress={onClose} /><Btn kind="ghost" label={tr("im.again")} onPress={() => { setPage(null); setText(""); setStep("party"); setParty(null); setNewParty(null); }} /></Row>
       </View>
@@ -139,7 +139,7 @@ export function Import({ businessId, parties, onClose, onDone }: { businessId: s
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>{head}
       <ScrollView contentContainerStyle={body} keyboardShouldPersistTaps="handled">
-        <Text style={{ fontSize: FONT.title - 4, fontWeight: "700", color: t.fg }}>{party?.name ?? newParty?.name} · {tr("im.review")}</Text>
+        <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 4, color: t.fg }}>{party?.name ?? newParty?.name} · {tr("im.review")}</Text>
 
         <View style={{ padding: 12, gap: 6, borderRadius: 12, borderWidth: 2, borderColor: rec.ok ? t.paid : t.due, backgroundColor: t.surface }}>
           <Text style={{ fontSize: FONT.body, fontWeight: "700", color: rec.ok ? t.paid : t.due }}>{rec.ok ? tr("im.allMatch") : tr("im.mismatch")}</Text>

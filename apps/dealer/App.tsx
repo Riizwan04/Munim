@@ -25,7 +25,10 @@ import { Onboarding } from "./src/Onboarding";
 import { Items } from "./src/Items";
 import { PartyEdit } from "./src/PartyEdit";
 import { Pressable, Text } from "react-native";
-import { FONT } from "./src/theme";
+import { FONT, HEAD, ThemeProvider, useThemeMode } from "./src/theme";
+import { BottomNav } from "./src/BottomNav";
+import { Logo } from "./src/Logo";
+import { useFonts, Baloo2_700Bold } from "@expo-google-fonts/baloo-2";
 import type { ResolvedEntry } from "@munim/ledger-core";
 import { PartyList } from "./src/PartyList";
 import { loadParties, type Overview, type PartyRow } from "./src/data";
@@ -54,6 +57,7 @@ type Screen =
 
 function AppInner() {
   const t = useTheme();
+  const { scheme } = useThemeMode();
   const { tr } = useI18n();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [screen, setScreen] = useState<Screen>({ name: "parties" });
@@ -133,22 +137,17 @@ function AppInner() {
     const p = fresh(screen.party)!;
     body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} onEditParty={() => setScreen({ name: "partyEdit", party: p })} onStatement={() => setScreen({ name: "statement", party: p })} onRemind={() => setScreen({ name: "reminders", only: p })} />;
   } else if (screen.name === "items" && data) body = <Items businessId={data.businessId} />;
-  else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onTalk={() => setScreen({ name: "talk" })} onSettings={() => setScreen({ name: "settings" })} />;
+  else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onSettings={() => setScreen({ name: "settings" })} />;
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-        <StatusBar style="auto" />
+      <SafeAreaView edges={["top", "left", "right", "bottom"]} style={{ flex: 1, backgroundColor: session && data?.businessId && screen.name === "parties" ? t.hero : t.bg }}>
+        <StatusBar style={scheme === "dark" || (session && data?.businessId && screen.name === "parties") ? "light" : "dark"} />
         {session && data?.businessId && screen.name !== "sync" ? <SyncBanner onOpen={() => setScreen({ name: "sync" })} /> : null}
-        <View style={{ flex: 1 }}>{body}</View>
+        <View style={{ flex: 1, backgroundColor: t.bg }}>{body}</View>
         {session && data?.businessId && (screen.name === "parties" || screen.name === "items" || screen.name === "reports" || (screen.name === "reminders" && !screen.only)) ? (
-          <View style={{ flexDirection: "row", borderTopWidth: 1, borderColor: t.line, backgroundColor: t.surface }}>
-            {([["parties", tr("tab.parties")], ["reminders", tr("tab.reminders")], ["reports", tr("tab.reports")], ["items", tr("tab.items")]] as const).map(([k, label]) => (
-              <Pressable key={k} onPress={() => setScreen(k === "items" ? { name: "items" } : k === "reminders" ? { name: "reminders" } : k === "reports" ? { name: "reports" } : { name: "parties" })} accessibilityRole="tab" style={{ flex: 1, minHeight: 56, alignItems: "center", justifyContent: "center", borderTopWidth: 3, borderColor: screen.name === k ? t.accent : "transparent" }}>
-                <Text style={{ fontSize: FONT.body, fontWeight: "700", color: screen.name === k ? t.accent : t.muted }}>{label}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <BottomNav active={screen.name} onTalk={() => setScreen({ name: "talk" })}
+            onGo={(k) => setScreen(k === "items" ? { name: "items" } : k === "reminders" ? { name: "reminders" } : k === "reports" ? { name: "reports" } : { name: "parties" })} />
         ) : null}
       </SafeAreaView>
     </SafeAreaProvider>
@@ -159,16 +158,25 @@ export default function App() {
   // A customer's link (#/s/<token>) shows only their statement: no login, no dealer app, no offline queue.
   const read = () => (Platform.OS === "web" && typeof window !== "undefined" ? tokenFromHash(window.location.hash) : null);
   const [token, setToken] = useState<string | null>(read);
+  const [fonts] = useFonts({ Baloo2_700Bold });
+  const [waited, setWaited] = useState(false);
+  useEffect(() => { const id = setTimeout(() => setWaited(true), 2500); return () => clearTimeout(id); }, []); // never wait forever for a font
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const f = () => setToken(read());
     window.addEventListener("hashchange", f);
     return () => window.removeEventListener("hashchange", f);
   }, []);
-  if (token) return <SafeAreaProvider><SafeAreaView style={{ flex: 1 }}><PublicStatement token={token} /></SafeAreaView></SafeAreaProvider>;
   return (
-    <I18nProvider>
-      <AppInner />
-    </I18nProvider>
+    <ThemeProvider>
+      {!fonts && !waited ? <Splash /> : token
+        ? <SafeAreaProvider><SafeAreaView style={{ flex: 1 }}><PublicStatement token={token} /></SafeAreaView></SafeAreaProvider>
+        : <I18nProvider><AppInner /></I18nProvider>}
+    </ThemeProvider>
   );
+}
+
+function Splash() {
+  const t = useTheme();
+  return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: t.hero }}><Logo size={96} /></View>;
 }
