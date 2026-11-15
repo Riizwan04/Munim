@@ -1,5 +1,5 @@
 import { ScrollView, Text, TextInput } from "react-native";
-import { saveTagline } from "./data";
+import { saveAssistantName, saveBusinessName, saveTagline } from "./data";
 import { LANGS, useI18n } from "./i18n";
 import { useState } from "react";
 import Constants from "expo-constants";
@@ -10,15 +10,17 @@ import { useReachable } from "./offline/net";
 import { shareText } from "./share";
 import { requestSignOut } from "./offline/signout";
 import { FONT, useTheme, useThemeMode, HEAD } from "./theme";
-import { Btn, Chip, Row, Section } from "./ui";
+import { Btn, Chip, Field, Row, Section } from "./ui";
 
 /** App language (screens) and assistant language (its questions and read-back) are chosen separately (PRD FR-02). */
-export function Settings({ onBack, businessId, tagline, onSaved }: { onBack: () => void; businessId: string; tagline: string; onSaved: () => void }) {
+export function Settings({ onBack, businessId, tagline, business, assistantName, onSaved, handsFree, onHandsFree }: { onBack: () => void; businessId: string; tagline: string; business: string; assistantName: string; onSaved: () => void; handsFree: boolean; onHandsFree: (on: boolean) => void }) {
   const t = useTheme();
   const { mode, setMode } = useThemeMode();
   const { tr, ui, asst, setUi, setAsst } = useI18n();
   const [note, setNote] = useState("");
   const [tag, setTag] = useState(tagline);
+  const [bizName, setBizName] = useState(business);
+  const [aName, setAName] = useState(assistantName);
   const online = useReachable();
   const { pending, failed } = useOutbox();
   const version = Constants.expoConfig?.version ?? "?";
@@ -26,10 +28,23 @@ export function Settings({ onBack, businessId, tagline, onSaved }: { onBack: () 
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, gap: 20 }}>
       <Text onPress={onBack} accessibilityRole="button" style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ {tr("common.back")}</Text>
       <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{tr("set.title")}</Text>
+      <Section title="Business profile">
+        <Field label="Business name" nativeID="set-biz" value={bizName} onChangeText={setBizName} />
+        <Row wrap={false}><Btn kind="ghost" label={tr("set.taglineSave")} disabled={bizName.trim().length < 2} onPress={async () => { try { await saveBusinessName(businessId, bizName); onSaved(); setNote(tr("set.taglineDone")); } catch { setNote(tr("set.taglineFail")); } }} /></Row>
+      </Section>
+      <Section title="Your assistant">
+        <Field label="Assistant name" nativeID="set-asst" value={aName} onChangeText={(v) => setAName(v.slice(0, 20))} />
+        <Row wrap={false}><Btn kind="ghost" label={tr("set.taglineSave")} disabled={aName.trim().length < 2} onPress={async () => { try { await saveAssistantName(businessId, aName); onSaved(); setNote(tr("set.taglineDone")); } catch { setNote(tr("set.taglineFail")); } }} /></Row>
+        <Text style={{ fontSize: FONT.small, color: t.muted }}>Each business names its own assistant. This is the name you say to wake it in hands-free mode.</Text>
+      </Section>
       <Section title={tr("set.tagline")}>
         <TextInput nativeID="tagline" value={tag} onChangeText={setTag} maxLength={60} placeholder={tr("set.taglinePh")} placeholderTextColor={t.muted}
           style={{ borderWidth: 1.5, borderColor: t.line, borderRadius: 12, padding: 12, fontSize: FONT.body, color: t.fg, backgroundColor: t.surface }} />
         <Row wrap={false}><Btn kind="ghost" label={tr("set.taglineSave")} onPress={async () => { try { await saveTagline(businessId, tag); onSaved(); setNote(tr("set.taglineDone")); } catch { setNote(tr("set.taglineFail")); } }} /></Row>
+      </Section>
+      <Section title={tr("hf.title")}>
+        <Row><Chip label={tr("hf.on")} on={handsFree} onPress={() => onHandsFree(true)} /><Chip label={tr("hf.off")} on={!handsFree} onPress={() => onHandsFree(false)} /></Row>
+        <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("hf.note")}</Text>
       </Section>
       <Section title={tr("theme.title")}>
         <Row>{(["system", "light", "dark"] as const).map((m) => <Chip key={m} label={tr(`theme.${m}` as const)} on={mode === m} onPress={() => setMode(m)} />)}</Row>

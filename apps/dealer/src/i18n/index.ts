@@ -11,7 +11,14 @@ export type { Key };
 
 type Vars = Record<string, string | number>;
 const fill = (s: string, v?: Vars) => (v ? s.replace(/\{(\w+)\}/g, (_, k) => (k in v ? String(v[k]) : `{${k}}`)) : s);
-export const translate = (lang: Lang, key: Key, vars?: Vars) => fill(DICT[lang][key] ?? en[key] ?? key, vars);
+let asstNameNow = "";
+/** Every business names its own assistant: in the assistant's own phrases ("Talk to Munim") the name is swapped in. */
+export const setAssistantNameNow = (n: string) => { asstNameNow = n.trim(); };
+const ASSISTANT_KEYS = /^(talk|v|q|a|c|hf)\./;
+export const translate = (lang: Lang, key: Key, vars?: Vars) => {
+  const s = fill(DICT[lang][key] ?? en[key] ?? key, vars);
+  return asstNameNow && ASSISTANT_KEYS.test(key) ? s.replace(/Munim|मुनीम/g, asstNameNow) : s;
+};
 let uiNow: Lang = "en";
 /** For code outside components (error messages). Follows the app language setting. */
 export const translateNow = (key: Key, vars?: Vars) => translate(uiNow, key, vars);

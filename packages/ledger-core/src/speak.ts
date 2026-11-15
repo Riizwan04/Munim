@@ -81,3 +81,14 @@ export const modeToSpeech = (m: PaymentMode, lang: SpeakLang) => MODE_WORDS[lang
 
 /** "JSW" is read letter by letter ("J S W"); other words are left alone. */
 export const spellAcronyms = (s: string) => s.replace(/\b[A-Z]{2,5}\b/g, (w) => w.split("").join(" "));
+
+const MONTH_NAMES: Record<SpeakLang, string[]> = {
+  en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  hi: ["जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"],
+  mr: ["जानेवारी", "फेब्रुवारी", "मार्च", "एप्रिल", "मे", "जून", "जुलै", "ऑगस्ट", "सप्टेंबर", "ऑक्टोबर", "नोव्हेंबर", "डिसेंबर"],
+};
+/** "2026-11-12" → "twelve November" / "बारह नवंबर". */
+export function dateToSpeech(iso: string, lang: SpeakLang): string {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${numberToWords(d!, lang)} ${MONTH_NAMES[lang][m! - 1]}`;
+}

@@ -1,11 +1,14 @@
 import { isDone, isNo, isNoSite, isYes, parseChoice, parseModeAnswer, parseNumberAnswer, parseUnitAnswer, detectSpokenLang, type Choice } from "./answers";
 import { buildDraft, parseQty, parseRupees, type DraftLine, type EntryPayload } from "./entryDraft";
 import { entryEffect, partyBalance, creditLimitWarning } from "./ledger";
+import { findMaterial } from "./assistant";
+import { looksLikeQuestion } from "./ask";
 import { matchMaterial, NEW_ITEM_UNITS, validUnit, type MaterialRef } from "./materials";
 import type { Paise } from "./money";
 import { rateLooksUnusual, suggestRate } from "./rates";
-import { qtyToSpeech, rupeesToSpeech, spellAcronyms, unitToSpeech, modeToSpeech, type SpeakLang } from "./speak";
+import { dateToSpeech, qtyToSpeech, rupeesToSpeech, spellAcronyms, unitToSpeech, modeToSpeech, type SpeakLang } from "./speak";
 import { hasToken, isDevanagari } from "./phonetic";
+import { hasQuestionWord, lastPayment, lastPurchase, parseSpokenDate, partyIn, routeCommand, stripWakeWord, topDue, totalDue, type AssistantAction, type Command, type Overview } from "./assistant";
 import { scanNumbers, tokenize } from "./spoken";
 import type { Entry, EntryType, PaymentMode } from "./types";
 import { heuristicUnderstand, normalizeUnit, resolveUtterance, unitOf, type ParsedUtterance, type PartyRef, type Question, type UnderstandContext } from "./understand";
@@ -15,30 +18,38 @@ import { heuristicUnderstand, normalizeUnit, resolveUtterance, unitOf, type Pars
  * "Say" intents), whether to listen next, and what to show. It never saves anything: saving is the owner's tap.
  * All money is computed by code (buildDraft); the voice only fills in the blanks.
  */
-export type SayVar = string | number | { rupees: Paise } | { qty: number; unit: string } | { name: string; alt?: string } | { mode: PaymentMode } | { say: Say } | { list: { name: string; alt?: string }[] };
+export type SayVar = string | number | { rupees: Paise } | { qty: number; unit: string } | { name: string; alt?: string } | { mode: PaymentMode } | { date: string } | { unit: string } | { prose: string } | { say: Say } | { list: { name: string; alt?: string }[] };
 export interface Say { key: string; vars?: Record<string, SayVar> }
 
-export type Phase = "idle" | "await_entries" | "asking" | "readback" | "correcting" | "await_more" | "ended";
+export type Phase = "idle" | "await_entries" | "asking" | "readback" | "correcting" | "await_more" | "ended" | "cmd_party" | "cmd_item";
 export interface CardLine { name: string; qty: number; unit: string; rate: Paise; total: Paise; isNew?: boolean }
 export interface EntryCard {
-  partyId: string; party: string; site?: string; type: EntryType; lines: CardLine[]; total: Paise;
+  date: string; partyId: string; party: string; site?: string; type: EntryType; lines: CardLine[]; total: Paise;
   paymentMode?: PaymentMode | null; oldBalance: Paise; newBalance: Paise; payload: EntryPayload; warnings: string[];
 }
 export interface View { phase: Phase; card?: EntryCard; position?: { i: number; n: number }; unknownParty?: string; needsManual: boolean; saved: number }
-export interface Output { say: Say[]; listen: boolean; view: View; lang: SpeakLang }
+export interface Output { say: Say[]; listen: boolean; view: View; lang: SpeakLang; /** something for the app to open or prepare (the owner then taps) */ action?: AssistantAction }
 
 export interface DialogueCtx {
   businessId: string; today: string; parties: PartyRef[]; materials: MaterialRef[];
   partyInfo(partyId: string): { name: string; opening: Paise; creditLimit: Paise | null };
   /** Active entries of the party, including any still waiting to upload. */
   partyEntries(partyId: string): Entry[];
+  /** The AI reader is available: questions the rules cannot answer are sent to it (see `ask`). */
+  canAsk?: boolean;
+  /** What this business called its assistant ("Jarvis"): the name that wakes it. */
+  assistantName?: string;
+  /** The customer whose page is open: "add 20 bags for this person" means them. */
+  currentPartyId?: string;
+  /** Everyone's balances and today's totals, for "how much is outstanding in total?". */
+  overview?(): Overview;
   understand?: (text: string, ctx: UnderstandContext) => ParsedUtterance;
   /** Makes the id of an item said aloud that is not in the list yet (a real uuid in the app). */
   newId?: () => string;
 }
 
 interface EntryState {
-  type: EntryType; partyId?: string; partyOptions: PartyRef[]; siteId?: string | null; lines: DraftLine[]; amount: string; mode?: PaymentMode | null;
+  date?: string; type: EntryType; partyId?: string; partyOptions: PartyRef[]; siteId?: string | null; lines: DraftLine[]; amount: string; mode?: PaymentMode | null;
   spoken: { party?: string; site?: string; materials: (string | undefined)[] }; fails: number; unknownParty?: string;
 }
 type Q = Question | { kind: "unknownParty"; spoken: string };
@@ -58,6 +69,7 @@ export class Dialogue {
   private session = new Map<string, Paise>();
   private lastCard: EntryCard | undefined;
   private newCount = 0;
+  private pendingCmd: Command | null = null;
 
   constructor(private ctx: DialogueCtx, opts: { lang: SpeakLang }) { this.lang = opts.lang; }
 
@@ -82,13 +94,16 @@ export class Dialogue {
     return this.out([{ key: "v.noSpeech" }], false);
   }
 
-  heard(text: string): Output {
+  /** `parsed` = what the AI extractor made of this sentence; without it the built-in rules read it. */
+  heard(text: string, parsed?: ParsedUtterance): Output {
     // the language is the owner's choice in Settings: it never flips because a word or number was said in another language
+    text = stripWakeWord(text, this.ctx.assistantName || "munim").rest || text;
     switch (this.phase) {
-      case "await_entries": case "await_more": return this.onEntries(text);
+      case "cmd_party": case "cmd_item": return this.onCmdAnswer(text);
+      case "await_entries": case "await_more": return this.onEntries(text, parsed);
       case "asking": return this.onAnswer(text);
       case "readback": case "correcting": return this.onReadback(text);
-      case "idle": return this.onEntries(text);
+      case "idle": return this.onEntries(text, parsed);
       default: return this.out([], false);
     }
   }
@@ -116,14 +131,25 @@ export class Dialogue {
   handedOver(): Output { this.queue.shift(); this.cur = null; this.lastCard = undefined; return this.next([]); }
 
   // ───────── understanding what was said ─────────
-  private onEntries(text: string): Output {
+  private onEntries(text: string, given?: ParsedUtterance): Output {
     if (this.phase === "await_more" || this.saved > 0) {
       if (isDone(text)) { this.phase = "ended"; return this.out([{ key: "v.done", vars: { n: this.saved } }], false); }
       if (isYes(text) && tokenize(text).length <= 2) { this.phase = "await_more"; return this.out([{ key: "v.goAhead" }], true); }
     }
-    const uctx: UnderstandContext = { parties: this.ctx.parties, materials: this.ctx.materials };
-    const parsed = (this.ctx.understand ?? heuristicUnderstand)(text, uctx);
+    // a question or a command for Munim ("Santosh ka kitna baaki hai", "reports kholo") is not a ledger entry
+    const cmd = routeCommand(text, { parties: this.ctx.parties, materials: this.ctx.materials, currentPartyId: this.ctx.currentPartyId });
+    if (cmd) return this.runCommand(cmd);
+    // any other question about the books goes to the AI reader (read-only tools on the owner's own data)
+    const qNums = scanNumbers(tokenize(text)).length > 0;
+    if (looksLikeQuestion(text, qNums, hasQuestionWord(text))) {
+      if (this.ctx.canAsk) { this.phase = "await_more"; const o = this.out([], false); o.action = { kind: "ask", text }; return o; }
+      this.phase = "await_more"; return this.out([{ key: "a.noReader" }], true); // never read a question as an entry
+    }
+    const uctx: UnderstandContext = { parties: this.ctx.parties, materials: this.ctx.materials, currentPartyId: this.ctx.currentPartyId };
+    const date = parseSpokenDate(text, this.ctx.today) ?? undefined;
+    const parsed = given ?? (this.ctx.understand ?? heuristicUnderstand)(text, uctx);
     const resolved = resolveUtterance(parsed, uctx);
+    if (resolved.length === 0 && looksLikeQuestion(text, qNums, hasQuestionWord(text))) { this.phase = "await_more"; return this.out([{ key: "a.noReader" }], true); }
     if (resolved.length === 0) {
       this.misses++;
       if (this.misses >= 2) { this.phase = "idle"; return this.out([{ key: "v.notUnderstood" }, { key: "v.useTap" }], false); }
@@ -131,7 +157,7 @@ export class Dialogue {
       return this.out([{ key: "v.notUnderstood" }], true);
     }
     this.misses = 0;
-    this.queue = resolved.map((r) => this.fromResolved(r));
+    this.queue = resolved.map((r) => ({ ...this.fromResolved(r), date }));
     this.cur = this.queue[0]!;
     return this.advance(this.queue.length > 1 ? [{ key: "v.several", vars: { n: this.queue.length } }] : []);
   }
@@ -266,7 +292,7 @@ export class Dialogue {
     const party = this.ctx.parties.find((p) => p.id === s.partyId)!;
     const info = this.ctx.partyInfo(party.id);
     const site = s.siteId ? party.sites.find((x) => x.id === s.siteId)?.name : undefined;
-    const draft = buildDraft({ businessId: this.ctx.businessId, partyId: party.id, siteId: s.siteId ?? null, type: s.type, date: this.ctx.today, lines: s.type === "sale" || s.type === "return" ? s.lines : [], amount: s.amount, paymentMode: s.mode, source: "voice" }, this.ctx.materials);
+    const draft = buildDraft({ businessId: this.ctx.businessId, partyId: party.id, siteId: s.siteId ?? null, type: s.type, date: s.date ?? this.ctx.today, lines: s.type === "sale" || s.type === "return" ? s.lines : [], amount: s.amount, paymentMode: s.mode, source: "voice" }, this.ctx.materials);
     if (!draft.payload) { s.fails++; this.phase = "idle"; return this.outManual([{ key: "v.useTap" }]); }
     const entries = this.ctx.partyEntries(party.id);
     const oldBalance = partyBalance(info.opening, entries) + (this.session.get(party.id) ?? 0);
@@ -287,7 +313,7 @@ export class Dialogue {
       if (sug && r !== null && rateLooksUnusual(r, sug)) { warnings.push("rate"); if (!warnSay.some((w) => w.key === "v.checkRate")) warnSay.push({ key: "v.checkRate" }); }
     });
 
-    const card: EntryCard = { partyId: party.id, party: party.name, site, type: s.type, lines, total: draft.total, paymentMode: s.mode ?? null, oldBalance, newBalance, payload: p, warnings };
+    const card: EntryCard = { date: p.entry_date, partyId: party.id, party: party.name, site, type: s.type, lines, total: draft.total, paymentMode: s.mode ?? null, oldBalance, newBalance, payload: p, warnings };
     this.lastCard = card;
     this.phase = "readback";
     const siteSay: SayVar = site ? { say: { key: "v.atSite", vars: { site } } } : "";
@@ -299,7 +325,8 @@ export class Dialogue {
     } else if (s.type === "payment") main = { key: "v.readPayment", vars: { party: sayName(party), amount: { rupees: draft.total }, mode: { mode: s.mode! }, old: base.old, new: base.new } };
     else main = { key: "v.readFlat", vars: { kind: { say: { key: s.type === "charge" ? "v.kindCharge" : "v.kindDiscount" } }, party: sayName(party), amount: { rupees: draft.total }, old: base.old, new: base.new } };
     const newNote: Say[] = lines.filter((l) => l.isNew).slice(0, 1).map((l) => ({ key: "v.newItemNote", vars: { name: l.name } }));
-    return this.out([...prefix, main, ...newNote, ...warnSay, { key: "v.tapSave" }], true);
+    const dateNote: Say[] = p.entry_date !== this.ctx.today ? [{ key: "v.dateNote", vars: { date: { date: p.entry_date } } }] : [];
+    return this.out([...prefix, main, ...dateNote, ...newNote, ...warnSay, { key: "v.tapSave" }], true);
   }
 
   private onReadback(text: string): Output {
@@ -335,6 +362,80 @@ export class Dialogue {
     return { state: { amount: fmt(spans[0]!.value) } };
   }
 
+  /** The AI reader's answer to a free question (null = it could not be reached). */
+  answeredFree(text: string | null): Output {
+    this.phase = "await_more"; this.misses = 0;
+    return this.out([text ? { key: "a.free", vars: { text: { prose: text } } } : { key: "a.askFailed" }], true);
+  }
+
+  // ───────── questions and commands ─────────
+  private partyRef(id: string): PartyRef | undefined { return this.ctx.parties.find((p) => p.id === id); }
+  private runCommand(cmd: Command): Output {
+    this.misses = 0; this.pendingCmd = null;
+    const act = (action: AssistantAction, say: Say): Output => { this.phase = "await_entries"; const o = this.out([say], false); o.action = action; return o; };
+    switch (cmd.kind) {
+      case "needParty": this.pendingCmd = cmd; this.phase = "cmd_party"; return this.out([{ key: "q.partyAsk" }], true);
+      case "needItem": this.pendingCmd = cmd; this.phase = "cmd_item"; return this.out([{ key: "a.askItem" }], true);
+      case "goto": return act({ kind: "goto", screen: cmd.screen }, { key: "c.goto", vars: { screen: { say: { key: `n.${cmd.screen}` } } } });
+      case "open": { const p = this.partyRef(cmd.partyId)!; return act({ kind: "open", partyId: p.id }, { key: "c.opening", vars: { name: sayName(p) } }); }
+      case "remind": { const p = this.partyRef(cmd.partyId)!; return act({ kind: "remind", partyId: p.id }, { key: "c.remind", vars: { party: sayName(p) } }); }
+      case "newParty": return act({ kind: "newParty", name: cmd.name, phone: cmd.phone }, { key: "c.newParty" });
+      case "query": this.phase = "await_more"; return this.out([this.answer(cmd)], true);
+    }
+  }
+  private onCmdAnswer(text: string): Output {
+    const c = this.pendingCmd;
+    if (!c) return this.advance([]);
+    const toks = tokenize(text);
+    if (c.kind === "needParty") {
+      const p = partyIn(toks, this.ctx.parties);
+      if (p) {
+        if (c.then === "remind") return this.runCommand({ kind: "remind", partyId: p.id });
+        if (c.then === "open") return this.runCommand({ kind: "open", partyId: p.id });
+        if (c.then === "lastRate") {
+          const m = c.materialText ? findMaterial(c.materialText, tokenize(c.materialText), this.ctx.materials) : null;
+          return m ? this.runCommand({ kind: "query", q: "lastRate", partyId: p.id, materialId: m.id }) : this.runCommand({ kind: "needItem", partyId: p.id });
+        }
+        return this.runCommand({ kind: "query", q: c.then, partyId: p.id });
+      }
+    } else if (c.kind === "needItem") {
+      const m = findMaterial(text, toks, this.ctx.materials);
+      if (m) return this.runCommand({ kind: "query", q: "lastRate", partyId: c.partyId, materialId: m.id });
+    }
+    this.misses++;
+    if (this.misses >= 2) { this.misses = 0; this.pendingCmd = null; this.phase = "idle"; return this.out([{ key: "v.notUnderstood" }], false); }
+    return this.out([{ key: "v.repeat" }, { key: c.kind === "needItem" ? "a.askItem" : "q.partyAsk" }], true);
+  }
+
+  /** The answer to a question about the books, built from the ledger (never guessed). */
+  private answer(cmd: Extract<Command, { kind: "query" }>): Say {
+    if (cmd.q === "totalDue" || cmd.q === "topDue" || cmd.q === "today") {
+      const o = this.ctx.overview?.();
+      if (!o) return { key: "a.unknown" };
+      if (cmd.q === "today") return { key: "a.today", vars: { sales: { rupees: o.todaySales }, coll: { rupees: o.todayCollections } } };
+      if (cmd.q === "totalDue") { const t = totalDue(o); return { key: "a.totalDue", vars: { amount: { rupees: t.total }, n: t.n } }; }
+      const top = topDue(o)[0];
+      if (!top) return { key: "a.nobodyOwes" };
+      const p = this.partyRef(top.id);
+      return { key: "a.topDue", vars: { party: p ? sayName(p) : top.name, amount: { rupees: top.balance } } };
+    }
+    const pc = cmd as Extract<Command, { kind: "query"; partyId: string }>;
+    const p = this.partyRef(pc.partyId)!; const party = sayName(p);
+    const info = this.ctx.partyInfo(p.id); const entries = this.ctx.partyEntries(p.id);
+    const matName = (id: string) => this.ctx.materials.find((m) => m.id === id)?.name ?? "?";
+    switch (pc.q) {
+      case "balance": { const bal = partyBalance(info.opening, entries); return bal > 0 ? { key: "a.balance", vars: { party, amount: { rupees: bal } } } : bal < 0 ? { key: "a.balanceAdvance", vars: { party, amount: { rupees: -bal } } } : { key: "a.balanceClear", vars: { party } }; }
+      case "lastPayment": { const lp = lastPayment(entries); return !lp ? { key: "a.noPayment", vars: { party } } : lp.mode ? { key: "a.lastPaymentMode", vars: { party, date: { date: lp.date }, amount: { rupees: lp.amount }, mode: { mode: lp.mode } } } : { key: "a.lastPayment", vars: { party, date: { date: lp.date }, amount: { rupees: lp.amount } } }; }
+      case "lastPurchase": { const lp = lastPurchase(entries, matName); return !lp ? { key: "a.noPurchase", vars: { party } } : { key: "a.lastPurchase", vars: { party, date: { date: lp.date }, items: { list: lp.items.map((n) => ({ name: n })) }, amount: { rupees: lp.total } } }; }
+      case "lastRate": {
+        let best: { date: string; rate: Paise; unit: string; id: string } | undefined;
+        for (const e of entries) if (e.status === "active" && e.type === "sale") for (const l of e.lines ?? []) if (l.materialId === (pc as { materialId: string }).materialId && (!best || e.date > best.date || (e.date === best.date && e.id > best.id))) best = { date: e.date, rate: l.rate, unit: l.unit, id: e.id };
+        const m = this.ctx.materials.find((x) => x.id === (pc as { materialId: string }).materialId)!;
+        return best ? { key: "a.lastRate", vars: { party, item: matName(m.id), rate: { rupees: best.rate }, unit: { unit: best.unit }, date: { date: best.date } } } : { key: "a.noRate", vars: { party, item: matName(m.id) } };
+      }
+    }
+  }
+
   /** The entry as it stands, for the owner to finish by hand in the normal form. */
   manualDraft(): { type: EntryType; partyId?: string; siteId: string | null; lines: DraftLine[]; amount: string; paymentMode: PaymentMode | null; questions: Question[] } | null {
     const s = this.cur;
@@ -357,6 +458,9 @@ function renderVar(v: SayVar, lang: SpeakLang, t: Translate, spell = true): stri
   if ("rupees" in v) return rupeesToSpeech(v.rupees, lang);
   if ("qty" in v) return `${qtyToSpeech(v.qty, lang)} ${unitToSpeech(v.unit, v.qty, lang)}`;
   if ("mode" in v) return modeToSpeech(v.mode, lang);
+  if ("date" in v) return dateToSpeech(v.date, lang);
+  if ("prose" in v) return spell ? v.prose.replace(/₹\s?([\d,]+(?:\.\d+)?)/g, (_, n: string) => rupeesToSpeech(Math.round(Number(n.replace(/,/g, "")) * 100), lang)) : v.prose; // spoken: amounts in words
+  if ("unit" in v) return unitToSpeech(v.unit, 1000, lang);
   if ("name" in v) return sp(lang !== "en" && v.alt ? v.alt : v.name);
   if ("say" in v) return renderSay(v.say, lang, t, spell);
   return v.list.map((x) => sp(lang !== "en" && x.alt ? x.alt : x.name)).join(", ");

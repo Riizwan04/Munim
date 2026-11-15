@@ -1,4 +1,5 @@
-import { partyStats, getPreset, partyBalance, entryEffect, pendingAsEntries, type Entry, type EntryPayload, type MaterialRef, type PartyRef, type EntryType, type PublicStatementPayload, type PublicError, isPublicError } from "@munim/ledger-core";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { romanizeName, partyStats, getPreset, partyBalance, entryEffect, pendingAsEntries, type Entry, type EntryPayload, type MaterialRef, type PartyRef, type EntryType, type PublicStatementPayload, type PublicError, isPublicError } from "@munim/ledger-core";
 import { Platform } from "react-native";
 import { localToday } from "./dates";
 import { getItems } from "./offline/outbox";
@@ -9,7 +10,7 @@ export interface PartyRow {
   id: string; name: string; phone: string; opening: number; balance: number; creditLimit: number | null;
   nicknames: string[]; language: string; overdueDays: number | null;
 }
-export interface Overview { businessId: string; business: string; tagline: string; parties: PartyRow[]; todaySales: number; todayCollections: number }
+export interface Overview { businessId: string; business: string; tagline: string; assistantName: string; parties: PartyRow[]; todaySales: number; todayCollections: number }
 export interface LedgerRow {
   key: string; entryId?: string; kind: "balance" | "line" | "payment" | "charge" | "total";
   date?: string; item: string; qty?: string; rate?: number; amount: number; site?: string; pending?: boolean;
@@ -25,7 +26,8 @@ const toEntry = (r: any): Entry => ({
 const overviewRaw = () => withCache("overview", async () => {
     const [b, p, e] = await Promise.all([
       // until migration 0006 is run the tagline column does not exist: fall back to the plain query
-      supabase.from("businesses").select("id,name,tagline").limit(1).maybeSingle().then((r) => r.error ? supabase.from("businesses").select("id,name").limit(1).maybeSingle() : r),
+      // newer columns (tagline: migration 0006, assistant_name: 0008) may not exist yet: fall back step by step
+      (async () => { for (const cols of ["id,name,tagline,assistant_name", "id,name,tagline", "id,name"]) { const r = await supabase.from("businesses").select(cols).limit(1).maybeSingle(); if (!r.error) return r as { data: any; error: null }; } return supabase.from("businesses").select("id,name").limit(1).maybeSingle() as any; })(),
       supabase.from("parties").select("id,name,phone,opening_balance,credit_limit,nicknames,preferred_language"),
       supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,entry_lines(material_id,quantity,unit,rate,gst_bp)"),
     ]);
@@ -53,7 +55,7 @@ export async function loadParties(): Promise<Overview> {
       nicknames: x.nicknames ?? [], language: x.preferred_language ?? "hi", overdueDays: st.overdueDays,
     };
   }).sort((a, b) => b.balance - a.balance);
-  return { businessId: b.data?.id ?? "", business: b.data?.name ?? "Munim", tagline: (b.data as any)?.tagline ?? "", parties, todaySales, todayCollections };
+  return { businessId: b.data?.id ?? "", business: b.data?.name ?? "Munim", tagline: (b.data as any)?.tagline ?? "", assistantName: ((b.data as any)?.assistant_name ?? "") || (await localAssistantName()), parties, todaySales, todayCollections };
 }
 
 const trim = (n: number) => String(Math.round(n * 1000) / 1000);
@@ -148,9 +150,9 @@ export const saveEntry = async (p: EntryPayload) => must(await supabase.rpc("sav
 export const editEntry = async (id: string, p: EntryPayload, reason: string) => must(await supabase.rpc("edit_entry", { p_entry_id: id, p, p_reason: reason }));
 export const cancelEntry = async (id: string, reason: string) => { must(await supabase.rpc("cancel_entry", { p_entry_id: id, p_reason: reason })); };
 export const createParty = async (businessId: string, name: string, phone: string) =>
-  must(await supabase.from("parties").insert({ business_id: businessId, name, phone, preferred_language: "en" }).select("id").single()).id as string;
+  must(await supabase.from("parties").insert({ business_id: businessId, name: romanizeName(name), phone, preferred_language: "en" }).select("id").single()).id as string;
 export const createSite = async (businessId: string, partyId: string, name: string) =>
-  must(await supabase.from("sites").insert({ business_id: businessId, party_id: partyId, name }).select("id").single()).id as string;
+  must(await supabase.from("sites").insert({ business_id: businessId, party_id: partyId, name: romanizeName(name) }).select("id").single()).id as string;
 
 export async function loadUnderstandContext(): Promise<{ parties: PartyRef[]; materials: MaterialRef[] }> {
   const raw = await withCache("understand", async () => {
@@ -183,12 +185,12 @@ export async function loadMaterialsFull(): Promise<MaterialFull[]> {
   return (r.data ?? []).map((m) => ({ id: m.id, name: m.name, category: m.category, units: m.units, localNames: m.local_names ?? [] }));
 }
 export const saveMaterial = async (businessId: string, m: { id?: string; name: string; category: string; units: string[]; localNames: string[] }) => {
-  const row = { name: m.name, category: m.category || null, units: m.units, local_names: m.localNames };
+  const row = { name: romanizeName(m.name), category: m.category ? romanizeName(m.category) : null, units: m.units, local_names: m.localNames };
   if (m.id) must(await supabase.from("materials").update(row).eq("id", m.id).select("id"));
   else must(await supabase.from("materials").insert({ ...row, business_id: businessId }).select("id"));
 };
 export const updateParty = async (id: string, v: { name: string; phone: string; nicknames: string[]; creditLimit: number | null; opening: number; language: string }) => {
-  must(await supabase.from("parties").update({ name: v.name, phone: v.phone, nicknames: v.nicknames, credit_limit: v.creditLimit, opening_balance: v.opening, preferred_language: v.language }).eq("id", id).select("id"));
+  must(await supabase.from("parties").update({ name: romanizeName(v.name), phone: v.phone, nicknames: v.nicknames, credit_limit: v.creditLimit, opening_balance: v.opening, preferred_language: v.language }).eq("id", id).select("id"));
 };
 
 export interface StatementData { businessName: string; entries: Entry[]; materialNames: Record<string, string>; siteNames: Record<string, string>; sites: { id: string; name: string }[] }
@@ -260,7 +262,7 @@ export async function loadImportContext(partyId: string): Promise<{ sites: { id:
   return { sites: s.data ?? [], materials, existing: (e.data ?? []).map((x) => ({ date: x.entry_date, type: x.type as EntryType, amount: Number(x.amount) })) };
 }
 export const createPartyWithOpening = async (businessId: string, name: string, phone: string, openingPaise: number) =>
-  must(await supabase.from("parties").insert({ business_id: businessId, name, phone, opening_balance: openingPaise, preferred_language: "en" }).select("id").single()).id as string;
+  must(await supabase.from("parties").insert({ business_id: businessId, name: romanizeName(name), phone, opening_balance: openingPaise, preferred_language: "en" }).select("id").single()).id as string;
 /** Asks the "scan-ledger" edge function (AI vision) to read a photo of a khata page. Returns its raw JSON text. */
 export async function scanPagePhoto(base64: string, mime: string): Promise<string> {
   const r = await supabase.functions.invoke("scan-ledger", { body: { image: base64, mime } });
@@ -293,16 +295,18 @@ export { isPublicError };
 export interface VoiceContext {
   businessId: string; parties: PartyRef[]; materials: MaterialRef[];
   info: Record<string, { name: string; opening: number; creditLimit: number | null }>; entries: Record<string, Entry[]>;
+  /** everyone's balances and today's totals, for questions like "how much is outstanding in total?" */
+  overview: { parties: { id: string; name: string; balance: number }[]; todaySales: number; todayCollections: number };
 }
 /** Everything the conversation needs, from the phone's copy if there is no internet. Entries still waiting to upload count. */
 export async function loadVoiceContext(): Promise<VoiceContext> {
-  const [u, raw] = await Promise.all([loadUnderstandContext(), overviewRaw()]);
+  const [u, raw, ov] = await Promise.all([loadUnderstandContext(), overviewRaw(), loadParties()]);
   const entries: Record<string, Entry[]> = {};
   for (const r of raw.e) (entries[r.party_id] ??= []).push(toEntry(r));
   for (const en of pendingAsEntries(getItems())) (entries[en.partyId] ??= []).push(en);
   const info: VoiceContext["info"] = {};
   for (const x of raw.p) info[x.id] = { name: x.name, opening: Number(x.opening_balance), creditLimit: x.credit_limit === null ? null : Number(x.credit_limit) };
-  return { businessId: raw.b?.id ?? "", parties: u.parties, materials: u.materials, info, entries };
+  return { businessId: raw.b?.id ?? "", parties: u.parties, materials: u.materials, info, entries, overview: { parties: ov.parties.map((p) => ({ id: p.id, name: p.name, balance: p.balance })), todaySales: ov.todaySales, todayCollections: ov.todayCollections } };
 }
 
 /** The owner edits the line shown under the business name (RLS lets only the owner update the business). */
@@ -313,3 +317,17 @@ export async function saveTagline(businessId: string, tagline: string): Promise<
 export const subscribePush = async (token: string, pin: string, endpoint: string, p256dh: string, auth: string): Promise<{ ok?: boolean; error?: string }> =>
   must(await supabase.rpc("subscribe_push", { p_token: token, p_pin: pin || null, p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth })) as { ok?: boolean; error?: string };
 export const unsubscribePush = async (token: string, endpoint: string) => { must(await supabase.rpc("unsubscribe_push", { p_token: token, p_endpoint: endpoint })); };
+
+// ───────── the business's name for its assistant, and the owner's profile ─────────
+const K_ASST_NAME = "munim.assistantName";
+const localAssistantName = async () => { try { return (await AsyncStorage.getItem(K_ASST_NAME)) ?? ""; } catch { return ""; } };
+/** Saved on the business (so every phone of the owner shows it) and on this phone too, so it works before migration 0008 is run. */
+export async function saveAssistantName(businessId: string, name: string): Promise<void> {
+  const n = name.trim().slice(0, 20);
+  try { await AsyncStorage.setItem(K_ASST_NAME, n); } catch { /* ok */ }
+  const r = await supabase.from("businesses").update({ assistant_name: n }).eq("id", businessId).select("id");
+  if (r.error && !/assistant_name/.test(r.error.message)) throw new Error(r.error.message);
+}
+export async function saveBusinessName(businessId: string, name: string): Promise<void> {
+  must(await supabase.from("businesses").update({ name: name.trim().slice(0, 80) }).eq("id", businessId).select("id"));
+}

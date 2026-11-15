@@ -1,3 +1,4 @@
+import { understandRemote } from "./ai";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { heuristicUnderstand, resolveUtterance, type ResolvedEntry } from "@munim/ledger-core";
@@ -22,11 +23,7 @@ export function Voice({ onResolved, onCancel }: { onResolved: (entries: Resolved
   async function go() {
     if (!ctx) return;
     // Optional AI extractor (Supabase Edge Function "understand"); falls back to the built-in rules if it is off or fails.
-    let parsed = heuristicUnderstand(text, ctx);
-    if (process.env.EXPO_PUBLIC_UNDERSTAND_FUNCTION === "1") {
-      const r = await supabase.functions.invoke("understand", { body: { text, parties: ctx.parties, materials: ctx.materials } });
-      if (!r.error && Array.isArray(r.data?.entries) && r.data.entries.length) parsed = r.data;
-    }
+    const parsed = (await understandRemote(text, ctx)) ?? heuristicUnderstand(text, ctx);
     const resolved = resolveUtterance(parsed, ctx);
     if (resolved.length === 0) { setErr(ta("voice.fail")); return; }
     onResolved(resolved, text.trim());

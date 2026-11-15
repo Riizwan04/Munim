@@ -41,7 +41,7 @@ const DEV_DIGITS = "०१२३४५६७८९";
 export function normalizeInput(s: string): string {
   return foldDevanagari(s).toLowerCase()
     .replace(/[०-९]/g, (d) => String(DEV_DIGITS.indexOf(d)))
-    .replace(/₹|rs\.?|rupay[ea]?|rupees?|रुपये|रुपए|रुपया|रूपये|रुपयाला|रु\./g, " ")
+    .replace(/₹|(?<![a-z])(?:rs\.?|rupay[ea]?|rupees?)(?![a-z])|रुपये|रुपए|रुपया|रूपये|रुपयाला|रु\./g, " ")
     .replace(/(?<=[a-z])-(?=[a-z])/g, " ") // "thirty-nine" → "thirty nine"
     .replace(/[।॥]/g, ",");
 }

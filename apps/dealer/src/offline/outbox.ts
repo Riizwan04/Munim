@@ -1,3 +1,4 @@
+import { romanizeName } from "@munim/ledger-core";
 import { notifyParty, payloadAmount } from "../notify";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
@@ -69,7 +70,7 @@ async function run() {
       // items said aloud that were not in the list yet are created first (safe to repeat: an existing id is left alone)
       const { new_materials, ...payload } = it.payload;
       if (new_materials?.length) {
-        error = (await supabase.from("materials").upsert(new_materials.map((m) => ({ id: m.id, business_id: it.payload.business_id, name: m.name, category: m.category, units: m.units, local_names: [] })), { onConflict: "id", ignoreDuplicates: true })).error;
+        error = (await supabase.from("materials").upsert(new_materials.map((m) => ({ id: m.id, business_id: it.payload.business_id, name: romanizeName(m.name), category: m.category, units: m.units, local_names: [] })), { onConflict: "id", ignoreDuplicates: true })).error;
       }
       if (!error) error = (await supabase.rpc("save_entry", { p: payload })).error;
     } catch (e) { error = e; }

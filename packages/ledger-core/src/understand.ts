@@ -1,6 +1,8 @@
 import type { DraftLine } from "./entryDraft";
 import { matchMaterial, prettyItemName, type MaterialRef } from "./materials";
 import { foldDevanagari, hasToken, isDevanagari, sameWord, skeleton, stems } from "./phonetic";
+import { isDateWord, THIS } from "./assistant";
+import { romanizeWord } from "./romanize";
 import { isNumberWord, scanNumbers, tokenize, type NumberSpan } from "./spoken";
 import type { EntryType, PaymentMode } from "./types";
 
@@ -17,7 +19,7 @@ export interface ParsedEntry {
 export interface ParsedUtterance { entries: ParsedEntry[]; language?: "hi" | "mr" | "en" }
 
 export interface PartyRef { id: string; name: string; nicknames: string[]; sites: { id: string; name: string }[] }
-export interface UnderstandContext { parties: PartyRef[]; materials: MaterialRef[] }
+export interface UnderstandContext { parties: PartyRef[]; materials: MaterialRef[]; /** the customer whose page is open: used when no party is named */ currentPartyId?: string }
 
 export type Question =
   | { kind: "party"; spoken?: string; options: PartyRef[] }          // options empty = unknown name → offer "new party?"
@@ -85,7 +87,7 @@ function soundsLike(text: string, materials: MaterialRef[]): MaterialRef[] {
 
 /** MATCH + VALIDATE: turn extracted text into a form draft plus the follow-up questions still open. */
 export function resolveUtterance(parsed: ParsedUtterance, ctx: UnderstandContext): ResolvedEntry[] {
-  let lastParty: PartyRef | undefined;
+  let lastParty: PartyRef | undefined = ctx.currentPartyId ? ctx.parties.find((p) => p.id === ctx.currentPartyId) : undefined;
   return parsed.entries.map((e) => {
     const questions: Question[] = [];
     let party: PartyRef | undefined;
@@ -119,7 +121,7 @@ export function resolveUtterance(parsed: ParsedUtterance, ctx: UnderstandContext
           const near = soundsLike(it.materialText, ctx.materials);
           if (near.length === 1) material = near[0];
           else if (near.length > 1) questions.push({ kind: "material", line: i, spoken: it.materialText, options: near });
-          else if (tokenize(it.materialText).length) { fresh = true; newItems.push({ line: i, name: prettyItemName(tokenize(it.materialText)), unit: it.unit ? normalizeUnit(it.unit) : undefined }); }
+          else if (tokenize(it.materialText).length) { fresh = true; newItems.push({ line: i, name: prettyItemName(tokenize(it.materialText).map(romanizeWord)), unit: it.unit ? normalizeUnit(it.unit) : undefined }); }
           else questions.push({ kind: "material", line: i, spoken: it.materialText, options: [] });
         }
         let unit = it.unit ? normalizeUnit(it.unit) : undefined;
@@ -229,7 +231,7 @@ export function heuristicUnderstand(text: string, ctx: UnderstandContext): Parse
     }
     if (!partyText) {
       const k = tokens.findIndex(isKoNeLa);
-      if (k > 0) { const before = tokens.slice(0, k).filter((w) => !isNumberWord(w) && !HONORIFICS.has(w)); if (before.length && !mentions.length) partyText = before.join(" "); else if (before.length && mentions[0] && mentions[0].start > k) partyText = before.join(" "); }
+      if (k > 0) { const before = tokens.slice(0, k).filter((w) => !isNumberWord(w) && !HONORIFICS.has(w) && !modeOf(w) && !isDateWord(w) && !THIS.has(w) && !unitOf(w)); if (before.length && !mentions.length) partyText = before.join(" "); else if (before.length && mentions[0] && mentions[0].start > k) partyText = before.join(" "); }
     }
 
     // site: word before "site"/"saite", or a saved site name of the matched party
@@ -300,4 +302,29 @@ export function heuristicUnderstand(text: string, ctx: UnderstandContext): Parse
     else merged.push(e);
   }
   return { entries: merged };
+}
+
+const INTENTS = new Set(["sale", "payment", "charge", "discount", "return"]);
+const MODES = new Set(["cash", "upi", "cheque", "bank"]);
+const str = (x: unknown) => (typeof x === "string" && x.trim() ? x.trim() : undefined);
+const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x >= 0 ? x : undefined);
+
+/**
+ * What the AI extractor sent back, checked and cleaned (nulls removed, odd values dropped). Returns null when it is unusable,
+ * so the app falls back to its built-in rules. Nothing from the AI is trusted blindly: the owner still sees and taps Save.
+ */
+export function sanitizeParsed(raw: unknown): ParsedUtterance | null {
+  const r = raw as { entries?: unknown; language?: unknown } | null;
+  if (!r || !Array.isArray(r.entries) || r.entries.length === 0) return null;
+  const entries: ParsedEntry[] = [];
+  for (const e of r.entries as Record<string, unknown>[]) {
+    if (!e || typeof e.intent !== "string" || !INTENTS.has(e.intent)) continue;
+    const items: ParsedItem[] = [];
+    if (Array.isArray(e.items)) for (const it of e.items as Record<string, unknown>[]) { const m = str(it?.materialText); if (m) items.push({ materialText: m, quantity: num(it.quantity), unit: str(it.unit), rate: num(it.rate) }); }
+    const mode = str(e.paymentMode);
+    entries.push({ intent: e.intent as EntryType, partyText: str(e.partyText), siteText: str(e.siteText), items, amount: num(e.amount), paymentMode: mode && MODES.has(mode) ? (mode as PaymentMode) : undefined });
+  }
+  if (!entries.length) return null;
+  const l = r.language;
+  return { entries, language: l === "hi" || l === "mr" || l === "en" ? l : undefined };
 }

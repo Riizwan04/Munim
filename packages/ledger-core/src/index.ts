@@ -21,3 +21,6 @@ export * from "./speak";
 export * from "./answers";
 export * from "./dialogue";
 export * from "./notice";
+export * from "./romanize";
+export * from "./assistant";
+export * from "./ask";

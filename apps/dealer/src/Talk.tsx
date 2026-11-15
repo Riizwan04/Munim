@@ -1,3 +1,4 @@
+import { romanizeName, type AssistantAction } from "@munim/ledger-core";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import type { ResolvedEntry, SpeakLang } from "@munim/ledger-core";
@@ -13,15 +14,18 @@ const VOICE_LANGS = LANGS.filter((l) => l.k !== "mr"); // Marathi speech comes l
 const toSpeak = (l: string): SpeakLang => (l === "en" ? "en" : "hi");
 
 /** Jarvis-style: Munim greets, listens, shows each entry and reads it back. Only the owner's tap on Save saves. */
-export function Talk({ businessId, onClose, onType, onManual }: { businessId: string; onClose: () => void; onType: () => void; onManual: (draft: ResolvedEntry) => void }) {
+export function Talk({ businessId, onClose, onType, onManual, onAction, currentPartyId, initial, onPartyCreated, assistantName }: { assistantName?: string; businessId: string; onClose: () => void; onType: () => void; onManual: (draft: ResolvedEntry) => void; onAction: (a: AssistantAction) => void; currentPartyId?: string; initial?: string; onPartyCreated: (partyId: string) => void }) {
   const t = useTheme();
   const { tr, ta, asst, setAsst } = useI18n();
-  const c = useConversation(toSpeak(asst));
+  const [newParty, setNewParty] = useState(false); // "new customer" asked for by voice: the form is shown, the owner taps Create
+  const c = useConversation(toSpeak(asst), { assistantName, currentPartyId, onAction: (a) => { if (a.kind === "newParty") { setNp({ name: a.name ?? "", phone: a.phone ?? "" }); setNewParty(true); } else onAction(a); } });
   const { st } = c;
   const [showHeard, setShowHeard] = useState(false);
   const [np, setNp] = useState({ name: "", phone: "" });
   const started = useRef(false);
-  useEffect(() => { if (!started.current) { started.current = true; void c.begin(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const spokenParty = st.view.unknownParty;
+  useEffect(() => { if (spokenParty) setNp((p) => (p.name ? p : { ...p, name: romanizeName(spokenParty) })); }, [spokenParty]); // an unknown name is offered in English letters
+  useEffect(() => { if (!started.current) { started.current = true; void c.begin(initial); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the orb pulses while Munim speaks or listens
   const pulse = useRef(new Animated.Value(1)).current;
@@ -73,7 +77,7 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
           <View style={{ gap: 8, padding: 14, borderRadius: 16, borderWidth: 1.5, borderColor: t.ink, backgroundColor: t.surface }} testID="card">
             {st.view.position && st.view.position.n > 1 ? <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("talk.entryOf", { i: st.view.position.i, n: st.view.position.n })}</Text> : null}
             <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 2, color: t.ink }}>{card.party}{card.site ? ` · ${card.site}` : ""}</Text>
-            <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr(`type.${card.type}` as Key)}{card.paymentMode ? ` · ${tr(`mode.${card.paymentMode}` as Key)}` : ""}</Text>
+            <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr(`type.${card.type}` as Key)} · {card.date.slice(8)}-{card.date.slice(5, 7)}{card.paymentMode ? ` · ${tr(`mode.${card.paymentMode}` as Key)}` : ""}</Text>
             {card.lines.map((l, i) => <View key={i} style={{ gap: 4 }}><Text style={{ fontSize: FONT.body + 1, color: t.fg }}>{ta("rv.line", { name: l.name, qty: l.qty / 1000, unit: l.unit, rate: rupee(l.rate), total: rupee(l.total) })}</Text>{l.isNew ? <View style={{ alignSelf: "flex-start" }}><Tag label={ta("talk.newItem")} tone="warn" /></View> : null}</View>)}
             <View style={{ borderTopWidth: 2, borderColor: t.ink, paddingTop: 8, gap: 2 }}>
               <Text style={{ fontSize: FONT.body, color: t.muted }}>{ta("rv.entryTotal", { v: rupee(card.total) })}</Text>
@@ -90,7 +94,7 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
           </View>
         ) : null}
 
-        {st.view.unknownParty ? (
+        {st.view.unknownParty || newParty ? (
           <View style={{ gap: 10, padding: 14, borderRadius: 14, borderWidth: 2, borderColor: t.accent, backgroundColor: t.surface }} testID="newparty">
             <Row wrap={false}>
               <Field label={tr("add.name")} nativeID="tk-name" value={np.name} onChangeText={(v) => setNp({ ...np, name: v })} />
@@ -98,9 +102,9 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
             </Row>
             <Row wrap={false}>
               <Btn label={tr("talk.addParty")} disabled={!np.name.trim() || np.phone.trim().length < 8} onPress={async () => {
-                try { const id = await createParty(businessId, np.name.trim(), np.phone.trim()); setNp({ name: "", phone: "" }); await c.partyAdded({ id, name: np.name.trim(), nicknames: [st.view.unknownParty!], sites: [] }); } catch { /* shown by the next step */ }
+                try { const id = await createParty(businessId, romanizeName(np.name), np.phone.trim()); setNp({ name: "", phone: "" }); if (newParty && !st.view.unknownParty) { setNewParty(false); onPartyCreated(id); } else await c.partyAdded({ id, name: romanizeName(np.name), nicknames: [st.view.unknownParty!], sites: [] }); } catch { /* shown by the next step */ }
               }} />
-              <Btn kind="ghost" label={tr("talk.skip")} onPress={() => void c.skip()} />
+              <Btn kind="ghost" label={tr("talk.skip")} onPress={() => { if (newParty && !st.view.unknownParty) setNewParty(false); else void c.skip(); }} />
             </Row>
           </View>
         ) : null}
