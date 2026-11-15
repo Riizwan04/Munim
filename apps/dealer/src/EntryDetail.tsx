@@ -1,3 +1,4 @@
+import { notifyParty } from "./notify";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { cancelEntry, loadEntry, type EntryDetail as Detail, type PartyRow } from "./data";
@@ -51,7 +52,7 @@ export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { ent
             <Field label={tr("detail.cancelReason")} nativeID="cancel-reason" value={reason} onChangeText={setReason} />
             <Text style={{ color: t.muted, fontSize: FONT.small }}>{tr("detail.cancelNote")}</Text>
             {busy ? <ActivityIndicator /> : <Row wrap={false}>
-              <Btn kind="danger" label={tr("detail.confirmCancel")} disabled={!reason.trim()} onPress={async () => { setBusy(true); try { await cancelEntry(d.id, reason.trim()); onChanged(); } catch (e: any) { setErr(fe(e)); setBusy(false); } }} />
+              <Btn kind="danger" label={tr("detail.confirmCancel")} disabled={!reason.trim()} onPress={async () => { setBusy(true); try { await cancelEntry(d.id, reason.trim()); void notifyParty(party.id, "cancelled"); onChanged(); } catch (e: any) { setErr(fe(e)); setBusy(false); } }} />
               <Btn kind="ghost" label={tr("common.no")} onPress={() => setCancelling(false)} />
             </Row>}
           </View>

@@ -32,6 +32,24 @@ self.addEventListener("fetch", (e) => {
   }
   e.respondWith(caches.match(r).then((hit) => hit || fetch(r).then((res) => { if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(r, clean(copy))); } return res; })));
 });
+
+// Customer notifications (web push): the shop's server sends {title, body}; tapping opens that customer's statement page.
+self.addEventListener("push", (e) => {
+  let d = { title: "Munim", body: "" };
+  try { d = Object.assign(d, e.data.json()); } catch (_) { /* plain text push */ }
+  e.waitUntil(self.registration.showNotification(d.title, { body: d.body, icon: "/icon-192.png", badge: "/icon-192.png" }));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    let url = "/";
+    try { const hit = await (await caches.open("meta-stmt")).match("/__stmt"); if (hit) url = await hit.text(); } catch (_) { /* use home */ }
+    const open = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    const same = open.find((c) => c.url.split("#")[0] === url.split("#")[0]);
+    if (same) { await same.focus(); return; }
+    await clients.openWindow(url);
+  })());
+});
 `;
 writeFileSync(join(dist, "sw.js"), sw);
 

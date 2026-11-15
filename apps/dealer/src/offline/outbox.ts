@@ -1,3 +1,4 @@
+import { notifyParty, payloadAmount } from "../notify";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
 import { useSyncExternalStore } from "react";
@@ -65,7 +66,7 @@ async function run() {
     items = markAttempt(items, it.id, new Date().toISOString());
     let error: unknown = null;
     try { error = (await supabase.rpc("save_entry", { p: it.payload })).error; } catch (e) { error = e; }
-    if (!error) { items = remove(items, it.id); sent++; await persist(); emit(); continue; }
+    if (!error) { items = remove(items, it.id); sent++; await persist(); emit(); void notifyParty(it.payload.party_id, it.payload.type, payloadAmount(it.payload)); continue; }
     const kind = classifyError(error);
     if (kind === "network") { retryIn = backoffMs(items.find((i) => i.id === it.id)!.attempts - 1); await persist(); break; }
     if (kind === "auth") { retryIn = 30_000; await persist(); break; }

@@ -309,3 +309,7 @@ export async function loadVoiceContext(): Promise<VoiceContext> {
 export async function saveTagline(businessId: string, tagline: string): Promise<void> {
   must(await supabase.from("businesses").update({ tagline: tagline.trim().slice(0, 60) }).eq("id", businessId).select("id"));
 }
+
+export const subscribePush = async (token: string, pin: string, endpoint: string, p256dh: string, auth: string): Promise<{ ok?: boolean; error?: string }> =>
+  must(await supabase.rpc("subscribe_push", { p_token: token, p_pin: pin || null, p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth })) as { ok?: boolean; error?: string };
+export const unsubscribePush = async (token: string, endpoint: string) => { must(await supabase.rpc("unsubscribe_push", { p_token: token, p_endpoint: endpoint })); };

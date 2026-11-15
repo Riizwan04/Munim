@@ -1,3 +1,4 @@
+import { notifyParty } from "./notify";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import {
@@ -124,7 +125,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
     if (!draft?.payload) return;
     setBusy(true); setErr("");
     try {
-      if (editingId) await editEntry(editingId, draft.payload, reason.trim()); // edits need the server
+      if (editingId) { await editEntry(editingId, draft.payload, reason.trim()); void notifyParty(draft.payload.party_id, "edited"); } // edits need the server
       else {
         // New entries go to the phone's outbox first (safe even with no signal), then upload.
         const item = await enqueueEntry(draft.payload);

@@ -1,3 +1,4 @@
+import { brandInstallManifest, disablePush, enablePush, pushState, type PushState } from "./push";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, ScrollView, Text, TextInput, View } from "react-native";
 import { buildStatement, isPublicError, payloadToStatementInput, statementHtml, type Lang, type PublicStatementPayload } from "@munim/ledger-core";
@@ -35,6 +36,9 @@ export function PublicStatement({ token }: { token: string }) {
   const [busy, setBusy] = useState(false);
   const [period, setPeriod] = useState<Period>("month");
   const [siteId, setSiteId] = useState<string | null>(null);
+  const [ps, setPs] = useState<PushState>("unsupported");
+  const [pushErr, setPushErr] = useState(false);
+  useEffect(() => { if (phase !== "ready" || !data) return; brandInstallManifest(data.business.name); void pushState().then(setPs); }, [phase, data]);
 
   useEffect(() => { // keep the page and its link out of search engines and referrer headers
     if (Platform.OS !== "web" || typeof document === "undefined") return;
@@ -104,6 +108,19 @@ export function PublicStatement({ token }: { token: string }) {
         <Section title={T("st.site")}>
           <Row><Chip label={T("st.allSites")} on={siteId === null} onPress={() => setSiteId(null)} />{d.sites.map((s) => <Chip key={s.id} label={s.name} on={siteId === s.id} onPress={() => setSiteId(s.id)} />)}</Row>
         </Section>
+      )}
+      {ps !== "unsupported" && (
+        <View style={{ gap: 8, padding: 14, borderRadius: 16, borderWidth: 1.5, borderColor: t.line, backgroundColor: t.surface }} testID="notify-card">
+          {ps === "on" ? <>
+            <Text style={{ fontSize: FONT.small, color: t.paid, fontWeight: "700" }}>{T("ps.notifyOn")}</Text>
+            <Row wrap={false}><Btn kind="ghost" label={T("ps.notifyOff")} onPress={async () => { await disablePush(token); setPs(await pushState()); }} /></Row>
+          </> : ps === "needs-install" ? <Text style={{ fontSize: FONT.small, color: t.fg }}>{T("ps.notifyInstall")}</Text>
+          : ps === "denied" ? <Text style={{ fontSize: FONT.small, color: t.due }}>{T("ps.notifyDenied")}</Text>
+          : <>
+            <Btn label={T("ps.notifyBtn")} onPress={async () => { setPushErr(false); const r = await enablePush(token, pin); if (r === "error") setPushErr(true); setPs(await pushState()); }} />
+            {pushErr ? <Text style={{ fontSize: FONT.small, color: t.due }}>{T("ps.notifyError")}</Text> : null}
+          </>}
+        </View>
       )}
       <StatementCard stmt={stmt!} emptyText={T("st.empty")} />
       <Row wrap={false}><Btn kind="ghost" label={T("st.pdf")} onPress={() => sharePdf(statementHtml(stmt!))} /></Row>

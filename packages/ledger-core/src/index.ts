@@ -20,3 +20,4 @@ export * from "./statementLink";
 export * from "./speak";
 export * from "./answers";
 export * from "./dialogue";
+export * from "./notice";
