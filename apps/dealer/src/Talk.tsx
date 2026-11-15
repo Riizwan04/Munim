@@ -5,6 +5,7 @@ import { createParty } from "./data";
 import { useI18n, LANGS, type Key } from "./i18n";
 import { rupee } from "./money";
 import { FONT, HEAD, useTheme } from "./theme";
+import { Tag } from "./Logo";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 import { useConversation, type Orb } from "./voice/useConversation";
 
@@ -50,11 +51,6 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16, alignItems: "stretch" }} keyboardShouldPersistTaps="handled">
-        <Section title={tr("talk.voiceLang")}>
-          <Row>{VOICE_LANGS.map((l) => <Chip key={l.k} label={l.label} on={toSpeak(asst) === l.k} onPress={() => { setAsst(l.k); c.stop(); }} />)}</Row>
-          <Text style={{ fontSize: 13, color: t.muted }}>{tr("talk.langNote")}</Text>
-        </Section>
-
         <View style={{ alignItems: "center", gap: 10, paddingVertical: 14 }}>
           <View style={{ width: 150, height: 150, alignItems: "center", justifyContent: "center" }}>
             {[0, 700, 1400].map((d) => <Ripple key={d} delay={d} color={orbColor[st.orb]} active={st.orb === "listening" || st.orb === "speaking"} />)}
@@ -78,7 +74,7 @@ export function Talk({ businessId, onClose, onType, onManual }: { businessId: st
             {st.view.position && st.view.position.n > 1 ? <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("talk.entryOf", { i: st.view.position.i, n: st.view.position.n })}</Text> : null}
             <Text style={{ fontFamily: HEAD, fontSize: FONT.title - 2, color: t.ink }}>{card.party}{card.site ? ` · ${card.site}` : ""}</Text>
             <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr(`type.${card.type}` as Key)}{card.paymentMode ? ` · ${tr(`mode.${card.paymentMode}` as Key)}` : ""}</Text>
-            {card.lines.map((l, i) => <Text key={i} style={{ fontSize: FONT.body + 1, color: t.fg }}>{ta("rv.line", { name: l.name, qty: l.qty / 1000, unit: l.unit, rate: rupee(l.rate), total: rupee(l.total) })}</Text>)}
+            {card.lines.map((l, i) => <View key={i} style={{ gap: 4 }}><Text style={{ fontSize: FONT.body + 1, color: t.fg }}>{ta("rv.line", { name: l.name, qty: l.qty / 1000, unit: l.unit, rate: rupee(l.rate), total: rupee(l.total) })}</Text>{l.isNew ? <View style={{ alignSelf: "flex-start" }}><Tag label={ta("talk.newItem")} tone="warn" /></View> : null}</View>)}
             <View style={{ borderTopWidth: 2, borderColor: t.ink, paddingTop: 8, gap: 2 }}>
               <Text style={{ fontSize: FONT.body, color: t.muted }}>{ta("rv.entryTotal", { v: rupee(card.total) })}</Text>
               <Text style={{ fontSize: FONT.body, color: t.muted }}>{tr("talk.old")}: {rupee(card.oldBalance)}</Text>

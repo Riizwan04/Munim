@@ -30,6 +30,8 @@ export interface EntryPayload {
   /** Unique id made on the phone so a retried upload can never create the entry twice (migration 0004). */
   client_id?: string;
   lines: { material_id: string; quantity: MilliQty; unit: string; rate: Paise; gst_bp: number | null; line_total: Paise }[];
+  /** Items said aloud that the shop had never sold: created (with this id) just before the entry is stored. */
+  new_materials?: { id: string; name: string; category: string | null; units: string[] }[];
 }
 export type DraftIssueCode = "date" | "items" | "item" | "unit" | "qty" | "rate" | "amount" | "mode";
 /** Machine-readable form of each error so the app can show it in any language. `line` is 1-based. */

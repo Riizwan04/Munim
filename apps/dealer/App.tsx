@@ -1,3 +1,4 @@
+import { Welcome } from "./src/Welcome";
 import { PhoneFrame } from "./src/PhoneFrame";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Platform, View } from "react-native";
@@ -59,7 +60,7 @@ type Screen =
 function AppInner() {
   const t = useTheme();
   const { scheme } = useThemeMode();
-  const { tr } = useI18n();
+  const { tr, asstChosen } = useI18n();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [screen, setScreen] = useState<Screen>({ name: "parties" });
   const [data, setData] = useState<Overview | null>(null);
@@ -107,6 +108,7 @@ function AppInner() {
   }
   if (session === undefined) body = <View style={{ flex: 1, justifyContent: "center" }}><ActivityIndicator /></View>;
   else if (!session) body = <Login />;
+  else if (asstChosen === false) body = <Welcome />;
   else if (data && !data.businessId) body = <Onboarding onDone={refresh} />;
   else if (screen.name === "reminders" && data)
     body = <Reminders businessId={data.businessId} business={data.business} parties={data.parties} only={screen.only}

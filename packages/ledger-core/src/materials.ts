@@ -12,6 +12,8 @@ export interface MaterialRef {
   category?: string | null; // "Cement"
   localNames: string[];
   units: string[]; // allowed units, e.g. ["butti", "mtr"]
+  /** Said out loud but not in the list yet: it is created when the owner taps Save. */
+  isNew?: boolean;
 }
 
 export type MaterialMatch =
@@ -45,4 +47,15 @@ export function matchMaterial(term: string, materials: MaterialRef[]): MaterialM
 /** Unit must be one the item is sold in (e.g. sand: butti or mtr, not bag). */
 export function validUnit(material: MaterialRef, unit: string): boolean {
   return material.units.some((u) => norm(u) === norm(unit));
+}
+
+/** Units offered for an item the shop has never sold before, until the owner says which one. */
+export const NEW_ITEM_UNITS = ["bag", "nos", "kg", "mtr", "ltr", "butti", "brass", "trolley", "ton"];
+
+/** "Acc cement" → "ACC cement" for short all-letter words; Devanagari is left exactly as heard. */
+export function prettyItemName(words: string[]): string {
+  // letters said as initials stay in capitals: TMT, PVC, JSW, ACC
+  const w = words.map((x) => (/^[a-z]{2,5}$/.test(x) && (!/[aeiou]/.test(x) || ["acc", "opc", "ppc", "ibr", "ptp", "gi", "ms", "pp", "gp"].includes(x)) ? x.toUpperCase() : x));
+  const joined = w.join(" ");
+  return joined.charAt(0).toUpperCase() + joined.slice(1);
 }

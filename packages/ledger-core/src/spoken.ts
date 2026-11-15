@@ -22,6 +22,14 @@ export const HI_WORDS_RAW = "एक दो तीन चार पाँच छ�
 export const MR_WORDS_RAW = "एक दोन तीन चार पाच सहा सात आठ नऊ दहा अकरा बारा तेरा चौदा पंधरा सोळा सतरा अठरा एकोणीस वीस एकवीस बावीस तेवीस चोवीस पंचवीस सव्वीस सत्तावीस अठ्ठावीस एकोणतीस तीस एकतीस बत्तीस तेहतीस चौतीस पस्तीस छत्तीस सदतीस अडतीस एकोणचाळीस चाळीस एकेचाळीस बेचाळीस त्रेचाळीस चव्वेचाळीस पंचेचाळीस सेहेचाळीस सत्तेचाळीस अठ्ठेचाळीस एकोणपन्नास पन्नास एकावन्न बावन्न त्रेपन्न चोपन्न पंचावन्न छप्पन्न सत्तावन्न अठ्ठावन्न एकोणसाठ साठ एकसष्ट बासष्ट त्रेसष्ट चौसष्ट पासष्ट सहासष्ट सदुसष्ट अडुसष्ट एकोणसत्तर सत्तर एकाहत्तर बाहत्तर त्र्याहत्तर चौऱ्याहत्तर पंचाहत्तर शहात्तर सत्त्याहत्तर अठ्ठ्याहत्तर एकोणऐंशी ऐंशी एक्याऐंशी ब्याऐंशी त्र्याऐंशी चौऱ्याऐंशी पंच्याऐंशी शहाऐंशी सत्त्याऐंशी अठ्ठ्याऐंशी एकोणनव्वद नव्वद एक्याण्णव ब्याण्णव त्र्याण्णव चौऱ्याण्णव पंच्याण्णव शहाण्णव सत्त्याण्णव अठ्ठ्याण्णव नव्व्याण्णव".split(" ");
 HI_WORDS_RAW.forEach((w, i) => { BASE[foldDevanagari(w)] = i + 1; });
 MR_WORDS_RAW.forEach((w, i) => { BASE[foldDevanagari(w)] ??= i + 1; });
+// English number words as a Hindi-set phone writes them in Devanagari ("तीन सौ नब्बे" may arrive as "थ्री हंड्रेड नाइंटी"): any mix is understood.
+const EN_DEV: Record<string, number> = {
+  वन: 1, टू: 2, थ्री: 3, फोर: 4, फाइव: 5, फाईव: 5, सिक्स: 6, सेवन: 7, एट: 8, नाइन: 9, टेन: 10, इलेवन: 11, एलेवन: 11, ट्वेल्व: 12, थर्टीन: 13, फोर्टीन: 14, फिफ्टीन: 15,
+  सिक्स्टीन: 16, सेवेन्टीन: 17, एटीन: 18, नाइनटीन: 19, ट्वेंटी: 20, ट्वेन्टी: 20, थर्टी: 30, फोर्टी: 40, फिफ्टी: 50, सिक्स्टी: 60, सेवंटी: 70, सेवेंटी: 70, सेवेन्टी: 70, एटी: 80, एइटी: 80, नाइंटी: 90, नाइन्टी: 90,
+};
+export const EN_TENS_DEV = new Set(["ट्वेंटी", "ट्वेन्टी", "थर्टी", "फोर्टी", "फिफ्टी", "सिक्स्टी", "सेवंटी", "सेवेंटी", "सेवेन्टी", "एटी", "एइटी", "नाइंटी", "नाइन्टी"].map(foldDevanagari));
+for (const [w, v] of Object.entries(EN_DEV)) BASE[foldDevanagari(w)] ??= v;
+for (const [w, v] of Object.entries({ हंड्रेड: 100, हन्ड्रेड: 100, हंडरेड: 100, थाउजेंड: 1000, थाऊजंड: 1000, थाउसंड: 1000 })) MULT[foldDevanagari(w)] = v;
 for (const [w, v] of Object.entries({ डेढ: 1.5, दीड: 1.5, ढाई: 2.5, अढाई: 2.5, अडीच: 2.5, आधा: 0.5, अर्धा: 0.5, पाव: 0.25 })) BASE[foldDevanagari(w)] = v;
 for (const [w, v] of Object.entries({ सौ: 100, शंभर: 100, हजार: 1000, लाख: 100000 })) MULT[foldDevanagari(w)] = v;
 for (const [w, v] of Object.entries({ सवा: 0.25, सव्वा: 0.25, पौने: -0.25, पाऊण: -0.25, साढे: 0.5, साडे: 0.5 })) MOD[foldDevanagari(w)] = v;
@@ -48,7 +56,7 @@ export function parseNumberTokens(tokens: string[]): number | null {
     if (/^\d+(\.\d+)?$/.test(w)) { current += Number(w); hasCur = true; continue; }
     if (w in MOD) { mod = MOD[w]!; continue; }
     if (w in BASE) {
-      const isEnTens = ["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"].includes(w);
+      const isEnTens = ["twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"].includes(w) || EN_TENS_DEV.has(w);
       if (isEnTens && hasCur && current >= 1 && current <= 99 && Number.isInteger(current) && !mod) current = current * 100 + BASE[w]!; // "three sixty" → 360
       else current += BASE[w]! + mod;
       mod = 0; hasCur = true; continue;

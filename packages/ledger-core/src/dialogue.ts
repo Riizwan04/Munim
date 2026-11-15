@@ -1,7 +1,7 @@
 import { isDone, isNo, isNoSite, isYes, parseChoice, parseModeAnswer, parseNumberAnswer, parseUnitAnswer, detectSpokenLang, type Choice } from "./answers";
 import { buildDraft, parseQty, parseRupees, type DraftLine, type EntryPayload } from "./entryDraft";
 import { entryEffect, partyBalance, creditLimitWarning } from "./ledger";
-import { matchMaterial, validUnit, type MaterialRef } from "./materials";
+import { matchMaterial, NEW_ITEM_UNITS, validUnit, type MaterialRef } from "./materials";
 import type { Paise } from "./money";
 import { rateLooksUnusual, suggestRate } from "./rates";
 import { qtyToSpeech, rupeesToSpeech, spellAcronyms, unitToSpeech, modeToSpeech, type SpeakLang } from "./speak";
@@ -19,7 +19,7 @@ export type SayVar = string | number | { rupees: Paise } | { qty: number; unit: 
 export interface Say { key: string; vars?: Record<string, SayVar> }
 
 export type Phase = "idle" | "await_entries" | "asking" | "readback" | "correcting" | "await_more" | "ended";
-export interface CardLine { name: string; qty: number; unit: string; rate: Paise; total: Paise }
+export interface CardLine { name: string; qty: number; unit: string; rate: Paise; total: Paise; isNew?: boolean }
 export interface EntryCard {
   partyId: string; party: string; site?: string; type: EntryType; lines: CardLine[]; total: Paise;
   paymentMode?: PaymentMode | null; oldBalance: Paise; newBalance: Paise; payload: EntryPayload; warnings: string[];
@@ -33,6 +33,8 @@ export interface DialogueCtx {
   /** Active entries of the party, including any still waiting to upload. */
   partyEntries(partyId: string): Entry[];
   understand?: (text: string, ctx: UnderstandContext) => ParsedUtterance;
+  /** Makes the id of an item said aloud that is not in the list yet (a real uuid in the app). */
+  newId?: () => string;
 }
 
 interface EntryState {
@@ -55,6 +57,7 @@ export class Dialogue {
   private misses = 0;
   private session = new Map<string, Paise>();
   private lastCard: EntryCard | undefined;
+  private newCount = 0;
 
   constructor(private ctx: DialogueCtx, opts: { lang: SpeakLang }) { this.lang = opts.lang; }
 
@@ -80,7 +83,7 @@ export class Dialogue {
   }
 
   heard(text: string): Output {
-    this.lang = detectSpokenLang(text, this.lang);
+    // the language is the owner's choice in Settings: it never flips because a word or number was said in another language
     switch (this.phase) {
       case "await_entries": case "await_more": return this.onEntries(text);
       case "asking": return this.onAnswer(text);
@@ -96,6 +99,7 @@ export class Dialogue {
     if (card) {
       this.session.set(card.partyId, (this.session.get(card.partyId) ?? 0) + (card.type === "payment" || card.type === "discount" || card.type === "return" ? -card.total : card.total));
     }
+    for (const nm of card?.payload.new_materials ?? []) { const m = this.ctx.materials.find((x) => x.id === nm.id); if (m) delete m.isNew; } // now in the shop's list
     this.saved++;
     this.queue.shift(); this.cur = null; this.lastCard = undefined;
     return this.next([{ key: "v.saved" }]);
@@ -137,6 +141,14 @@ export class Dialogue {
     const sq = r.questions.find((q) => q.kind === "site") as Extract<Question, { kind: "site" }> | undefined;
     const spokenMat: (string | undefined)[] = [];
     for (const q of r.questions) if (q.kind === "material") spokenMat[q.line] = q.spoken;
+    // an item the shop never listed becomes a NEW item (created on Save); saying it twice is the same item
+    for (const ni of r.newItems) {
+      let m = this.ctx.materials.find((x) => x.isNew && x.name.toLowerCase() === ni.name.toLowerCase());
+      if (!m) { m = { id: this.ctx.newId?.() ?? `new-${Date.now()}-${++this.newCount}`, name: ni.name, category: null, localNames: [], units: ni.unit ? [ni.unit] : [...NEW_ITEM_UNITS], isNew: true }; this.ctx.materials.push(m); }
+      else if (ni.unit && !m.units.includes(ni.unit)) m.units = [ni.unit];
+      const line = r.lines[ni.line]!;
+      line.materialId = m.id; line.unit = ni.unit ?? (m.units.length === 1 ? m.units[0] : undefined);
+    }
     return {
       type: r.type, partyId: r.partyId, partyOptions: pq?.options ?? [], siteId: sq ? undefined : (r.siteId ?? null), lines: r.lines, amount: r.amount, mode: r.paymentMode,
       spoken: { party: pq?.spoken, site: sq?.spoken, materials: spokenMat }, fails: 0,
@@ -234,7 +246,7 @@ export class Dialogue {
       case "unit": {
         const m = this.ctx.materials.find((x) => x.id === s.lines[q.line]!.materialId)!;
         const u = parseUnitAnswer(text, m.units);
-        if (u) { s.lines[q.line]!.unit = u; ok = true; }
+        if (u) { s.lines[q.line]!.unit = u; if (m.isNew) m.units = [u]; ok = true; }
         break;
       }
       case "quantity": { const v = parseNumberAnswer(text); if (v !== null) { s.lines[q.line]!.qty = fmt(v); ok = true; } break; }
@@ -261,7 +273,10 @@ export class Dialogue {
     const p = draft.payload;
     const eff = entryEffect({ id: "new", partyId: party.id, type: p.type, date: p.entry_date, status: "active", amount: p.type === "sale" || p.type === "return" ? undefined : p.amount, paymentMode: p.payment_mode ?? undefined, lines: p.lines.map((l) => ({ materialId: l.material_id, quantity: l.quantity, unit: l.unit, rate: l.rate })) });
     const newBalance = oldBalance + eff;
-    const lines: CardLine[] = p.lines.map((l) => ({ name: this.ctx.materials.find((m) => m.id === l.material_id)?.name ?? "?", qty: l.quantity, unit: l.unit, rate: l.rate, total: l.line_total }));
+    const lines: CardLine[] = p.lines.map((l) => { const m = this.ctx.materials.find((x) => x.id === l.material_id); return { name: m?.name ?? "?", qty: l.quantity, unit: l.unit, rate: l.rate, total: l.line_total, isNew: m?.isNew || undefined }; });
+    const fresh = new Map<string, NonNullable<EntryPayload["new_materials"]>[number]>();
+    for (const l of p.lines) { const m = this.ctx.materials.find((x) => x.id === l.material_id); if (m?.isNew) fresh.set(m.id, { id: m.id, name: m.name, category: m.category ?? null, units: [l.unit] }); }
+    if (fresh.size) p.new_materials = [...fresh.values()];
 
     const warnings: string[] = []; const warnSay: Say[] = [];
     const cl = creditLimitWarning({ currentBalance: oldBalance, newEntryEffect: eff, creditLimit: info.creditLimit });
@@ -283,7 +298,8 @@ export class Dialogue {
       main.vars!.lines = { say: { key: "v.joined", vars: { parts: { list: lines.map((l) => ({ name: `${l.name}|${l.qty}|${l.unit}|${l.rate}` })) } } } };
     } else if (s.type === "payment") main = { key: "v.readPayment", vars: { party: sayName(party), amount: { rupees: draft.total }, mode: { mode: s.mode! }, old: base.old, new: base.new } };
     else main = { key: "v.readFlat", vars: { kind: { say: { key: s.type === "charge" ? "v.kindCharge" : "v.kindDiscount" } }, party: sayName(party), amount: { rupees: draft.total }, old: base.old, new: base.new } };
-    return this.out([...prefix, main, ...warnSay, { key: "v.tapSave" }], true);
+    const newNote: Say[] = lines.filter((l) => l.isNew).slice(0, 1).map((l) => ({ key: "v.newItemNote", vars: { name: l.name } }));
+    return this.out([...prefix, main, ...newNote, ...warnSay, { key: "v.tapSave" }], true);
   }
 
   private onReadback(text: string): Output {
@@ -322,7 +338,7 @@ export class Dialogue {
   /** The entry as it stands, for the owner to finish by hand in the normal form. */
   manualDraft(): { type: EntryType; partyId?: string; siteId: string | null; lines: DraftLine[]; amount: string; paymentMode: PaymentMode | null; questions: Question[] } | null {
     const s = this.cur;
-    return s ? { type: s.type, partyId: s.partyId, siteId: s.siteId ?? null, lines: s.lines.map((l) => ({ ...l })), amount: s.amount, paymentMode: s.mode ?? null, questions: [] } : null;
+    return s ? { type: s.type, partyId: s.partyId, siteId: s.siteId ?? null, lines: s.lines.map((l) => ({ ...l, materialId: this.ctx.materials.find((m) => m.id === l.materialId)?.isNew ? undefined : l.materialId })), amount: s.amount, paymentMode: s.mode ?? null, questions: [] } : null;
   }
 
   // ───────── output ─────────

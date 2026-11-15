@@ -16,35 +16,39 @@ let uiNow: Lang = "en";
 /** For code outside components (error messages). Follows the app language setting. */
 export const translateNow = (key: Key, vars?: Vars) => translate(uiNow, key, vars);
 
-interface Ctx { ui: Lang; asst: Lang; setUi: (l: Lang) => void; setAsst: (l: Lang) => void }
-const I18n = createContext<Ctx>({ ui: "en", asst: "en", setUi: () => {}, setAsst: () => {} });
-const K_UI = "munim.uiLang", K_ASST = "munim.asstLang";
+interface Ctx { ui: Lang; asst: Lang; setUi: (l: Lang) => void; setAsst: (l: Lang) => void; asstChosen: boolean | undefined; chooseAsst: (l: Lang) => void }
+const I18n = createContext<Ctx>({ ui: "en", asst: "en", setUi: () => {}, setAsst: () => {}, asstChosen: true, chooseAsst: () => {} });
+const K_UI = "munim.uiLang", K_ASST = "munim.asstLang", K_CHOSEN = "munim.asstChosen";
 const valid = (x: unknown): x is Lang => x === "en" || x === "hi" || x === "mr";
 
 /** App language (screens) and assistant language (questions, read-back) are separate, and both default to English. */
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [ui, setUiState] = useState<Lang>("en");
   const [asst, setAsstState] = useState<Lang>("en");
+  const [asstChosen, setChosen] = useState<boolean | undefined>(undefined); // undefined = still reading the phone's settings
   useEffect(() => {
     (async () => {
       try {
         const [a, b] = await Promise.all([AsyncStorage.getItem(K_UI), AsyncStorage.getItem(K_ASST)]);
         if (valid(a)) setUiState(a);
         if (valid(b)) setAsstState(b);
-      } catch { /* storage unavailable: stay on English */ }
+        setChosen(valid(b) || (await AsyncStorage.getItem(K_CHOSEN)) === "1"); // phones that already picked a language are not asked again
+      } catch { setChosen(true); /* storage unavailable: stay on English, do not nag */ }
     })();
   }, []);
   const setUi = useCallback((l: Lang) => { setUiState(l); AsyncStorage.setItem(K_UI, l).catch(() => {}); }, []);
   const setAsst = useCallback((l: Lang) => { setAsstState(l); AsyncStorage.setItem(K_ASST, l).catch(() => {}); }, []);
+  /** First open: the owner picks the language Munim speaks, once. After that it only changes in Settings. */
+  const chooseAsst = useCallback((l: Lang) => { setAsst(l); setChosen(true); AsyncStorage.setItem(K_CHOSEN, "1").catch(() => {}); }, [setAsst]);
   uiNow = ui;
-  const value = useMemo(() => ({ ui, asst, setUi, setAsst }), [ui, asst, setUi, setAsst]);
+  const value = useMemo(() => ({ ui, asst, setUi, setAsst, asstChosen, chooseAsst }), [ui, asst, setUi, setAsst, asstChosen, chooseAsst]);
   return createElement(I18n.Provider, { value }, children);
 }
 
 export function useI18n() {
-  const { ui, asst, setUi, setAsst } = useContext(I18n);
+  const { ui, asst, setUi, setAsst, asstChosen, chooseAsst } = useContext(I18n);
   return {
-    ui, asst, setUi, setAsst,
+    ui, asst, setUi, setAsst, asstChosen, chooseAsst,
     /** screen text, in the app language */
     tr: (key: Key, vars?: Vars) => translate(ui, key, vars),
     /** screen text with singular/plural: uses key_one when n === 1, else key_other */

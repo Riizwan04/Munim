@@ -245,6 +245,8 @@ export const en = {
   "v.fixWhat": "What should I change? For example: forty bags, or rate three sixty.",
   "v.corrected": "Corrected.",
   "v.cantFix": "I couldn't change that by voice. Please tap Edit.",
+  "v.newItemNote": "{name} is a new item. It will be added to your list when you save.",
+  "talk.newItem": "NEW ITEM",
   "v.tapSave": "Please check and tap Save.",
   "v.tapSavePlease": "Please tap the Save button. I never save by voice alone.",
   "v.checkRate": "Please note, this rate is very different from last time.",

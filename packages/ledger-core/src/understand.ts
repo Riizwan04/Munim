@@ -1,6 +1,6 @@
 import type { DraftLine } from "./entryDraft";
-import { matchMaterial, type MaterialRef } from "./materials";
-import { foldDevanagari, hasToken, isDevanagari, sameWord, stems } from "./phonetic";
+import { matchMaterial, prettyItemName, type MaterialRef } from "./materials";
+import { foldDevanagari, hasToken, isDevanagari, sameWord, skeleton, stems } from "./phonetic";
 import { isNumberWord, scanNumbers, tokenize, type NumberSpan } from "./spoken";
 import type { EntryType, PaymentMode } from "./types";
 
@@ -32,6 +32,8 @@ export type Question =
 export interface ResolvedEntry {
   type: EntryType; partyId?: string; siteId?: string | null; lines: DraftLine[]; amount: string;
   paymentMode?: PaymentMode | null; questions: Question[];
+  /** Items said aloud that are not in the list: the dialogue adds them (the owner sees a NEW ITEM tag and they are created on Save). */
+  newItems: { line: number; name: string; unit?: string }[];
 }
 
 const fold = (xs: string[]) => xs.map(foldDevanagari);
@@ -68,6 +70,19 @@ export const normalizeUnit = (u: string) => unitOf(u.toLowerCase()) ?? u.toLower
 
 const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
 
+/** Two Roman spellings of one sound ("waddy" / "waddi"): same consonants and the same first letter. */
+const softSame = (a: string, b: string) => !isDevanagari(a) && !isDevanagari(b) && a[0] === b[0] && skeleton(a).length >= 2 && skeleton(a) === skeleton(b);
+
+/** Saved items whose name (or category / local name) every spoken word SOUNDS like: "waddy cement" → Waddi. Catches mishearing, so a new item is not made twice. */
+function soundsLike(text: string, materials: MaterialRef[]): MaterialRef[] {
+  const spoken = tokenize(text);
+  if (!spoken.length) return [];
+  return materials.filter((m) => {
+    const hay = [m.name, ...m.localNames, m.category ?? ""].flatMap((x) => tokenize(x));
+    return spoken.every((w) => hay.some((h) => sameWord(w, h) || softSame(w, h)));
+  });
+}
+
 /** MATCH + VALIDATE: turn extracted text into a form draft plus the follow-up questions still open. */
 export function resolveUtterance(parsed: ParsedUtterance, ctx: UnderstandContext): ResolvedEntry[] {
   let lastParty: PartyRef | undefined;
@@ -91,14 +106,25 @@ export function resolveUtterance(parsed: ParsedUtterance, ctx: UnderstandContext
     }
 
     const lines: DraftLine[] = [];
+    const newItems: ResolvedEntry["newItems"] = [];
     if (e.intent === "sale" || e.intent === "return") {
       e.items.forEach((it, i) => {
         const m = matchMaterial(it.materialText, ctx.materials);
         let material: MaterialRef | undefined;
+        let fresh = false;
         if (m.kind === "match") material = m.material;
-        else questions.push({ kind: "material", line: i, spoken: it.materialText, options: m.kind === "ambiguous" ? m.options : [] });
+        else if (m.kind === "ambiguous") questions.push({ kind: "material", line: i, spoken: it.materialText, options: m.options });
+        else {
+          // not on the list: a name that SOUNDS the same as a saved item is that item; otherwise it is a new item (created when the owner taps Save)
+          const near = soundsLike(it.materialText, ctx.materials);
+          if (near.length === 1) material = near[0];
+          else if (near.length > 1) questions.push({ kind: "material", line: i, spoken: it.materialText, options: near });
+          else if (tokenize(it.materialText).length) { fresh = true; newItems.push({ line: i, name: prettyItemName(tokenize(it.materialText)), unit: it.unit ? normalizeUnit(it.unit) : undefined }); }
+          else questions.push({ kind: "material", line: i, spoken: it.materialText, options: [] });
+        }
         let unit = it.unit ? normalizeUnit(it.unit) : undefined;
-        if (material) {
+        if (fresh) { /* the unit is settled by the dialogue once the new item exists */ }
+        else if (material) {
           if (unit && !material.units.some((u) => u.toLowerCase() === unit)) { questions.push({ kind: "unit", line: i, options: material.units }); unit = undefined; }
           else if (!unit && material.units.length === 1) unit = material.units[0];
           else if (!unit) questions.push({ kind: "unit", line: i, options: material.units });
@@ -113,7 +139,7 @@ export function resolveUtterance(parsed: ParsedUtterance, ctx: UnderstandContext
     }
     return {
       type: e.intent, partyId: party?.id, siteId, lines, amount: e.amount === undefined ? "" : fmt(e.amount),
-      paymentMode: e.intent === "payment" ? (e.paymentMode ?? null) : null, questions,
+      paymentMode: e.intent === "payment" ? (e.paymentMode ?? null) : null, questions, newItems,
     };
   });
 }
@@ -138,7 +164,30 @@ const isKoNeLa = (w: string) => ["ko", "ne", "la", "को", "ने", "ला"]
 const hasNe = (w: string) => w === "ne" || w === "ने" || (isDevanagari(w) && w.length > 2 && w.endsWith("ने"));
 const FILLER = new Set(["ka", "ki", "ke", "rate", "hisab", "se", "mein", "me", "per", "at", "of", "ne", "ko", "la", "diya", "dila", "diye", "bheja", "gave", "to", "from", "pe", "var", "site", "kar", "do", "kam", "jodo", "add", "rupay", "rupaye", "rs", "ruppe"]);
 
+const FILLER_DEV = new Set(fold(["का", "की", "के", "रेट", "भाव", "दर", "हिसाब", "से", "में", "पर", "को", "ने", "दिया", "दिये", "दिए", "लिखो", "लिख", "एंट्री", "एन्ट्री", "जोड़ो", "जोडो", "कर", "दो", "रुपये", "चाहिए", "भेजा", "माल", "सामान"]).concat(["likho", "entry", "dena", "de", "liya", "chahiye", "maal", "saman", "samaan", "sale", "kharida", "becha"]));
+
 interface Mention { start: number; end: number; text: string }
+
+/** An item the shop has never listed: the words around a quantity and a unit. */
+function findFreeItem(tokens: string[], spans: NumberSpan[], noise: (i: number) => boolean): Mention | null {
+  const mk = (start: number, end: number): Mention => ({ start, end, text: tokens.slice(start, end).join(" ") });
+  for (const s of spans) {
+    // "20 ACC cement bags": number, item words, unit
+    let j = s.end;
+    while (j < tokens.length && !noise(j) && j - s.end < 4) j++;
+    if (j > s.end && j < tokens.length && unitOf(tokens[j]!)) return mk(s.end, j);
+    // "20 bags ACC cement" / "ACC cement 20 bags": number, unit, then the item words after or before
+    if (s.end < tokens.length && unitOf(tokens[s.end]!)) {
+      let e = s.end + 1;
+      while (e < tokens.length && !noise(e) && e - (s.end + 1) < 4) e++;
+      if (e > s.end + 1) return mk(s.end + 1, e);
+      let b = s.start;
+      while (b > 0 && !noise(b - 1) && s.start - b < 4) b--;
+      if (b < s.start) return mk(b, s.start);
+    }
+  }
+  return null;
+}
 
 function findMentions(tokens: string[], materials: MaterialRef[]): Mention[] {
   const variants: { toks: string[] }[] = [];
@@ -198,7 +247,29 @@ export function heuristicUnderstand(text: string, ctx: UnderstandContext): Parse
     if (mentions.length === 0 && (tokens.some(hasNe) || mode || tokens.some((w) => PAID_WORDS.has(w)))) {
       entries.push({ intent: "payment", items: [], partyText, amount: firstAmount, paymentMode: mode }); continue;
     }
-    if (mentions.length === 0) continue;
+
+    // Words that are NOT part of an item name: numbers, units, "ka/ko/ne", the party and site words, payment words…
+    const partyWords = new Set(clean(partyText ?? "")); const siteWords = new Set(clean(siteText ?? ""));
+    const k0 = tokens.findIndex(isKoNeLa);
+    const low = k0 >= 0 && spans.length && k0 < spans[0]!.start ? k0 + 1 : 0; // everything before "ko/ne" is the party
+    const noise = (i: number) => {
+      const w = tokens[i]!;
+      return i < low || isNumberWord(w) || !!unitOf(w) || FILLER.has(w) || FILLER_DEV.has(w) || HONORIFICS.has(w) || isKoNeLa(w) || hasNe(w) || isSiteWord(w) || !!modeOf(w)
+        || CHARGE.has(w) || DISCOUNT.has(w) || RETURN.has(w) || PAID_WORDS.has(w) || partyWords.has(w) || siteWords.has(w);
+    };
+    // "ACC cement": a brand/word said just before a known item (or category) belongs to the item name
+    const inMention = (i: number) => mentions.some((m) => i >= m.start && i < m.end);
+    for (const m of mentions) {
+      let n = 0;
+      while (n < 3 && m.start > 0 && !noise(m.start - 1) && !inMention(m.start - 1)) { m.start--; n++; }
+      m.text = tokens.slice(m.start, m.end).join(" ");
+    }
+    // nothing on the list matches: read the sentence by its shape, "<qty> <item words> <unit> <rate>" (or unit first / item first)
+    if (mentions.length === 0) {
+      const free = findFreeItem(tokens, spans, noise);
+      if (!free) continue;
+      mentions.push(free);
+    }
 
     // items
     const unitAt = (i: number) => (i < tokens.length && unitOf(tokens[i]!) ? tokens[i]! : undefined);
@@ -208,7 +279,8 @@ export function heuristicUnderstand(text: string, ctx: UnderstandContext): Parse
       cands.sort((a, b) => Math.abs(a.start - m.start) - Math.abs(b.start - m.start));
       const q = cands[0];
       if (q) used.add(q);
-      return { materialText: m.text, quantity: q?.value, unit: q ? unitAt(q.end) : undefined };
+      // the unit is right after the number ("80 bag") or, when the number comes first, after the item name ("20 ACC cement bags")
+      return { materialText: m.text, quantity: q?.value, unit: q ? (unitAt(q.end) ?? (q.end === m.start ? unitAt(m.end) : undefined)) : undefined };
     });
     // rates: leftover numbers, nearest mention first
     mentions.forEach((m, i) => {

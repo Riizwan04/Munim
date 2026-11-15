@@ -65,7 +65,14 @@ async function run() {
     if (!user) break;
     items = markAttempt(items, it.id, new Date().toISOString());
     let error: unknown = null;
-    try { error = (await supabase.rpc("save_entry", { p: it.payload })).error; } catch (e) { error = e; }
+    try {
+      // items said aloud that were not in the list yet are created first (safe to repeat: an existing id is left alone)
+      const { new_materials, ...payload } = it.payload;
+      if (new_materials?.length) {
+        error = (await supabase.from("materials").upsert(new_materials.map((m) => ({ id: m.id, business_id: it.payload.business_id, name: m.name, category: m.category, units: m.units, local_names: [] })), { onConflict: "id", ignoreDuplicates: true })).error;
+      }
+      if (!error) error = (await supabase.rpc("save_entry", { p: payload })).error;
+    } catch (e) { error = e; }
     if (!error) { items = remove(items, it.id); sent++; await persist(); emit(); void notifyParty(it.payload.party_id, it.payload.type, payloadAmount(it.payload)); continue; }
     const kind = classifyError(error);
     if (kind === "network") { retryIn = backoffMs(items.find((i) => i.id === it.id)!.attempts - 1); await persist(); break; }

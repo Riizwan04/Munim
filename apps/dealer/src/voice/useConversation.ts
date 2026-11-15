@@ -1,3 +1,4 @@
+import * as Crypto from "expo-crypto";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialogue, renderSay, type DialogueCtx, type EntryPayload, type Output, type PartyRef, type SpeakLang, type View } from "@munim/ledger-core";
 import { loadVoiceContext, type VoiceContext } from "../data";
@@ -73,7 +74,7 @@ export function useConversation(initialLang: SpeakLang) {
         businessId: c.businessId, today: localToday(), parties: c.parties, materials: c.materials,
         partyInfo: (id) => c.info[id] ?? { name: id, opening: 0, creditLimit: null }, partyEntries: (id) => c.entries[id] ?? [],
       };
-      d.current = new Dialogue(dctx, { lang: initialLang });
+      d.current = new Dialogue({ ...dctx, newId: () => Crypto.randomUUID() }, { lang: initialLang });
       if (!(await voiceAvailable(initialLang))) patch({ problem: "no-voice" });
       await play(d.current.start(), tok);
     } catch (e) { patch({ orb: "idle", error: fe(e) }); }

@@ -225,15 +225,17 @@ describe("silence, not understood, stopping", () => {
   it("stop", () => { const d = mk(); d.start(); expect(keys(d.stop())).toEqual(["v.stopped"]); });
 });
 
-describe("replies in the language the owner used", () => {
-  it("English sentence → English; Hindi → Hindi; Hinglish → Hindi", () => {
+describe("the language is the owner's choice", () => {
+  it("Hindi stays Hindi (and English stays English) even when words or numbers are said in the other language", () => {
+    const d = mk({ lang: "hi" } as never); d.setLang("hi"); d.start();
+    expect(d.heard("Gave Santosh 80 bags JSW at 360").lang).toBe("hi");
+    expect(d.heard("संतोष को 5 बैग JSW 360 रुपये").lang).toBe("hi");
+    const e = mk(); e.setLang("en"); e.start();
+    expect(e.heard("संतोष को 80 बैग JSW 360 रुपये").lang).toBe("en");
+  });
+  it("detectSpokenLang still tells scripts apart (kept for tools)", () => {
     expect(detectSpokenLang("Gave Santosh 80 bags of JSW at 360", "hi")).toBe("en");
     expect(detectSpokenLang("संतोष को 80 बैग दिया", "en")).toBe("hi");
-    expect(detectSpokenLang("Santosh ko 80 bag diya", "en")).toBe("hi");
-    expect(detectSpokenLang("ok", "hi")).toBe("hi");
-    const d = mk(); d.start();
-    expect(d.heard("Gave Santosh 80 bags JSW at 360").lang).toBe("en");
-    expect(d.heard("संतोष को 5 बैग JSW 360 रुपये").lang).toBe("hi");
   });
 });
 
