@@ -17,3 +17,6 @@ export * from "./importPage";
 export * from "./config";
 export * from "./outbox";
 export * from "./statementLink";
+export * from "./speak";
+export * from "./answers";
+export * from "./dialogue";

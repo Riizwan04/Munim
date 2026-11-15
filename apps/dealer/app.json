@@ -7,10 +7,16 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.munim.dealer"
+      "bundleIdentifier": "app.munim.dealer",
+      "buildNumber": "1"
     },
     "android": {
-      "package": "app.munim.dealer"
+      "package": "app.munim.dealer",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1f3a8a"
+      },
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
@@ -19,7 +25,32 @@
       "shortName": "Munim",
       "themeColor": "#1f3a8a",
       "backgroundColor": "#f6f7f4",
-      "description": "Voice-first ledger for small businesses"
-    }
+      "description": "Voice-first ledger for small businesses",
+      "favicon": "./assets/favicon.png"
+    },
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1f3a8a"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Munim reads photos of handwritten ledger pages that you choose."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Munim listens to you speak your ledger entries.",
+          "speechRecognitionPermission": "Munim turns your speech into ledger entries.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ]
+    ]
   }
 }

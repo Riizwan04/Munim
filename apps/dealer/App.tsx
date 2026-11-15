@@ -8,6 +8,7 @@ import { EntryDetail } from "./src/EntryDetail";
 import { Ledger } from "./src/Ledger";
 import { Login } from "./src/Login";
 import { Voice } from "./src/Voice";
+import { Talk } from "./src/Talk";
 import { Statement } from "./src/Statement";
 import { Settings } from "./src/Settings";
 import { Reports } from "./src/Reports";
@@ -29,6 +30,8 @@ import type { ResolvedEntry } from "@munim/ledger-core";
 import { PartyList } from "./src/PartyList";
 import { loadParties, type Overview, type PartyRow } from "./src/data";
 import { configProblems, supabase } from "./src/supabase";
+import { installGlobalHandlers } from "./src/diagnostics";
+installGlobalHandlers();
 import { fe } from "./src/errors";
 import { useTheme } from "./src/theme";
 
@@ -37,6 +40,7 @@ type Screen =
   | { name: "parties" }
   | { name: "ledger"; party: PartyRow }
   | { name: "voice" }
+  | { name: "talk" }
   | { name: "items" }
   | { name: "reports" }
   | { name: "import" }
@@ -110,6 +114,9 @@ function AppInner() {
     body = <Statement party={fresh(screen.party)!} onBack={() => setScreen({ name: "ledger", party: screen.party })} />;
   else if (screen.name === "partyEdit")
     body = <PartyEdit party={fresh(screen.party)!} onBack={() => setScreen({ name: "ledger", party: screen.party })} onSaved={async () => { await refresh(); setRev((n) => n + 1); setScreen({ name: "ledger", party: screen.party }); }} />;
+  else if (screen.name === "talk" && data)
+    body = <Talk businessId={data.businessId} onClose={async () => { await refresh(); setRev((n) => n + 1); setScreen({ name: "parties" }); }} onType={() => setScreen({ name: "voice" })}
+      onManual={(draft) => { setQueue({ items: [draft as ResolvedEntry], i: 0, text: "" }); setScreen({ name: "add" }); }} />;
   else if (screen.name === "voice")
     body = <Voice onCancel={() => setScreen({ name: "parties" })} onResolved={(items, text) => { setQueue({ items, i: 0, text }); setScreen({ name: "add" }); }} />;
   else if (screen.name === "add" && data)
@@ -126,7 +133,7 @@ function AppInner() {
     const p = fresh(screen.party)!;
     body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} onEditParty={() => setScreen({ name: "partyEdit", party: p })} onStatement={() => setScreen({ name: "statement", party: p })} onRemind={() => setScreen({ name: "reminders", only: p })} />;
   } else if (screen.name === "items" && data) body = <Items businessId={data.businessId} />;
-  else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onVoice={() => setScreen({ name: "voice" })} onSettings={() => setScreen({ name: "settings" })} />;
+  else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onTalk={() => setScreen({ name: "talk" })} onSettings={() => setScreen({ name: "settings" })} />;
 
   return (
     <SafeAreaProvider>

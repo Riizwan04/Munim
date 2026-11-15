@@ -55,13 +55,12 @@ Three parts, three places:
 - [ ] Real Android phone and your iPhone (not only the browser): login, add entry, voice dictation, WhatsApp send, PDF, CSV.
 - [ ] Hindi, Marathi and English screens read by a native speaker.
 - [ ] Import 2-3 real handwritten pages; check totals match the written balances.
-- [ ] Weak-network test: a slow connection and airplane mode (offline entry saving is **not built yet**).
+- [ ] Weak-network test: a slow connection and airplane mode (offline entry saving works; see `docs/PHONE-TEST.md`).
 - [ ] Keep the paper khata in parallel for the first two weeks.
 
 ## 6. Known gaps (not built yet)
 
-- Offline entry saving and sync (PRD: Offline).
-- Party app / read-only statement view with OTP login (PRD F9).
+- Customer app with push alerts (a statement link with a 4-digit code exists; PRD F9 asks for OTP).
 - Phone-number OTP login (PRD FR-01).
 - In-app microphone, spoken replies.
 - Unit conversion (1 brass = 100 cu ft); UPI pay links; automatic reminders (manual reminders exist).

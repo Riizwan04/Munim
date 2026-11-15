@@ -49,7 +49,7 @@ export function useI18n() {
     tr: (key: Key, vars?: Vars) => translate(ui, key, vars),
     /** screen text with singular/plural: uses key_one when n === 1, else key_other */
     trn: (key: string, n: number, vars?: Vars) => translate(ui, `${key}_${n === 1 ? "one" : "other"}` as Key, { n, ...vars }),
-    /** the assistant's own words (questions, read-back), in the assistant language */
-    ta: (key: Key, vars?: Vars) => translate(asst, key, vars),
+    /** the assistant's written words (questions, read-back). Always English on screen; the assistant language is for what Munim SPEAKS. */
+    ta: (key: Key, vars?: Vars) => translate("en", key, vars),
   };
 }

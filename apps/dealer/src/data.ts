@@ -22,8 +22,7 @@ const toEntry = (r: any): Entry => ({
   lines: (r.entry_lines ?? []).map((l: any) => ({ materialId: l.material_id, quantity: Number(l.quantity), unit: l.unit, rate: Number(l.rate), gstBp: l.gst_bp ?? undefined })),
 });
 
-export async function loadParties(): Promise<Overview> {
-  const raw = await withCache("overview", async () => {
+const overviewRaw = () => withCache("overview", async () => {
     const [b, p, e] = await Promise.all([
       supabase.from("businesses").select("id,name").limit(1).maybeSingle(),
       supabase.from("parties").select("id,name,phone,opening_balance,credit_limit,nicknames,preferred_language"),
@@ -34,6 +33,9 @@ export async function loadParties(): Promise<Overview> {
     if (e.error) throw e.error;
     return { b: b.data, p: p.data ?? [], e: e.data ?? [] };
   });
+
+export async function loadParties(): Promise<Overview> {
+  const raw = await overviewRaw();
   const b = { data: raw.b }, p = { data: raw.p }, e = { data: raw.e };
   const byParty = new Map<string, Entry[]>();
   for (const r of e.data ?? []) (byParty.get(r.party_id) ?? byParty.set(r.party_id, []).get(r.party_id)!).push(toEntry(r));
@@ -285,3 +287,19 @@ export async function fetchPublicStatement(token: string, pin?: string): Promise
   return r.data as PublicStatementPayload | { error: PublicError };
 }
 export { isPublicError };
+
+// ───────── the talking assistant ─────────
+export interface VoiceContext {
+  businessId: string; parties: PartyRef[]; materials: MaterialRef[];
+  info: Record<string, { name: string; opening: number; creditLimit: number | null }>; entries: Record<string, Entry[]>;
+}
+/** Everything the conversation needs, from the phone's copy if there is no internet. Entries still waiting to upload count. */
+export async function loadVoiceContext(): Promise<VoiceContext> {
+  const [u, raw] = await Promise.all([loadUnderstandContext(), overviewRaw()]);
+  const entries: Record<string, Entry[]> = {};
+  for (const r of raw.e) (entries[r.party_id] ??= []).push(toEntry(r));
+  for (const en of pendingAsEntries(getItems())) (entries[en.partyId] ??= []).push(en);
+  const info: VoiceContext["info"] = {};
+  for (const x of raw.p) info[x.id] = { name: x.name, opening: Number(x.opening_balance), creditLimit: x.credit_limit === null ? null : Number(x.credit_limit) };
+  return { businessId: raw.b?.id ?? "", parties: u.parties, materials: u.materials, info, entries };
+}

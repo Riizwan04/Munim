@@ -9,8 +9,8 @@ import { FONT, useTheme } from "./theme";
 type Sort = "balance" | "overdue";
 
 /** Home: receivable, today's sales & collections, overdue count (FR-70) and the party list sorted by balance or days overdue (FR-71). */
-export function PartyList({ data, err, onOpen, onAdd, onVoice, onSettings, onRefresh }: {
-  data: Overview | null; err: string; onOpen: (p: PartyRow) => void; onAdd: () => void; onVoice: () => void; onSettings: () => void; onRefresh: () => Promise<void>;
+export function PartyList({ data, err, onOpen, onAdd, onTalk, onSettings, onRefresh }: {
+  data: Overview | null; err: string; onOpen: (p: PartyRow) => void; onAdd: () => void; onTalk: () => void; onSettings: () => void; onRefresh: () => Promise<void>;
 }) {
   const t = useTheme();
   const { tr, trn } = useI18n();
@@ -86,8 +86,8 @@ export function PartyList({ data, err, onOpen, onAdd, onVoice, onSettings, onRef
           <Pressable onPress={onAdd} accessibilityRole="button" style={{ paddingHorizontal: 18, minHeight: 56, justifyContent: "center", borderRadius: 28, borderWidth: 2, borderColor: t.paid }}>
             <Text style={{ fontSize: FONT.body, color: t.paid, fontWeight: "700" }}>{tr("home.entry")}</Text>
           </Pressable>
-          <Pressable onPress={onVoice} accessibilityRole="button" style={{ paddingHorizontal: 22, minHeight: 56, justifyContent: "center", borderRadius: 28, backgroundColor: t.paid }}>
-            <Text style={{ fontSize: FONT.body + 1, color: "#fff", fontWeight: "700" }}>{tr("home.speak")}</Text>
+          <Pressable onPress={onTalk} accessibilityRole="button" style={{ paddingHorizontal: 22, minHeight: 56, justifyContent: "center", borderRadius: 28, backgroundColor: t.paid }}>
+            <Text style={{ fontSize: FONT.body + 1, color: "#fff", fontWeight: "700" }}>{tr("talk.home")}</Text>
           </Pressable>
         </View>
       </View>

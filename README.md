@@ -11,6 +11,7 @@ Voice-first ledger and accountant for small businesses in India. First preset: b
 - `apps/dealer`: the Expo (React Native) app for Android, iPhone and web.
 - `supabase/migrations`: the database (per-business row-level security). `supabase/functions`: optional AI functions (not deployed).
 - `docs/DEPLOYMENT.md`: launch checklist, costs, what is still to build.
+- `docs/PHONE-TEST.md`: how to test on a real iPhone and Android phone.
 
 ## Run it
 

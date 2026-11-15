@@ -127,7 +127,7 @@ const MODE_WORDS: Record<string, PaymentMode> = {
     नकद: "cash", कैश: "cash", रोख: "cash", रोकड: "cash", नगद: "cash", चेक: "cheque", धनादेश: "cheque", बैंक: "bank", नेफ्ट: "bank", ट्रांसफर: "bank", बँक: "bank",
   }).map(([k, v]) => [foldDevanagari(k), v as PaymentMode])),
 };
-const modeOf = (token: string): PaymentMode | undefined => { for (const x of stems(token)) if (x in MODE_WORDS) return MODE_WORDS[x]; return undefined; };
+export const modeOf = (token: string): PaymentMode | undefined => { for (const x of stems(token)) if (x in MODE_WORDS) return MODE_WORDS[x]; return undefined; };
 const CHARGE = new Set(["bhada", "bhaada", "bhade", "transport", "gaadi", "gadi", "freight", "vahatuk", ...fold(["भाडा", "भाडे", "भाड़ा", "किराया", "किराये", "ट्रांसपोर्ट", "गाड़ी", "गाडी", "वाहतूक", "फ्रेट", "ढुलाई", "ढुलाई"])]);
 const DISCOUNT = new Set(["discount", "chhoot", "chhut", "concession", ...fold(["छूट", "डिस्काउंट", "सूट", "कन्सेशन"])]);
 const RETURN = new Set(["wapas", "vapas", "return", "parat", ...fold(["वापस", "वापसी", "रिटर्न", "परत", "लौटाया", "लौटाए", "लौटाये"])]);
