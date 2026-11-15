@@ -4,7 +4,7 @@ import type { Lang } from "./statement";
 export type NoticeKind = "sale" | "payment" | "return" | "charge" | "discount" | "edited" | "cancelled";
 
 /**
- * The push notification a customer gets when the shop records something on their account.
+ * The push notification a customer gets (their side of the books: a shop "sale" is the customer's "purchase") when the shop records something on their account.
  * Wording and every number come from here (never from the AI): amount of the entry and the balance after it.
  * Customer-facing text is in Roman script like the reminders, in the party's own language.
  */
@@ -14,17 +14,17 @@ export function entryNotice(a: { lang: Lang; businessName: string; kind: NoticeK
   const owes = a.balance > 0;
   const T = {
     en: {
-      sale: `Sale ${amt} added`, payment: `Payment ${amt} received. Thank you!`, return: `Return ${amt} noted`, charge: `Charge ${amt} added`, discount: `Discount ${amt} given`,
+      sale: `Purchase ${amt} added`, payment: `Payment ${amt} received. Thank you!`, return: `Return ${amt} noted`, charge: `Charge ${amt} added`, discount: `Discount ${amt} given`,
       edited: "An entry was corrected", cancelled: "An entry was cancelled",
       due: `Balance due: ${bal}`, adv: `Advance with us: ${bal}`, clear: "Account is clear", tap: "Tap to see your statement.",
     },
     hi: {
-      sale: `${amt} ka maal likha gaya`, payment: `${amt} mile. Dhanyavaad!`, return: `${amt} ka maal wapas likha gaya`, charge: `${amt} kharcha jodha gaya`, discount: `${amt} ki chhoot di gayi`,
+      sale: `Aapki ${amt} ki kharidi likhi gayi`, payment: `${amt} mile. Dhanyavaad!`, return: `${amt} ka maal wapas liya gaya`, charge: `${amt} kharcha jodha gaya`, discount: `${amt} ki chhoot di gayi`,
       edited: "Ek entry sudhari gayi", cancelled: "Ek entry radd ki gayi",
       due: `Baaki: ${bal}`, adv: `Aapka advance: ${bal}`, clear: "Hisaab saaf hai", tap: "Statement dekhne ke liye dabayein.",
     },
     mr: {
-      sale: `${amt} cha maal lihila`, payment: `${amt} milale. Dhanyavaad!`, return: `${amt} cha maal parat lihila`, charge: `${amt} kharcha jodla`, discount: `${amt} chi savalat dili`,
+      sale: `Tumchi ${amt} chi kharedi lihili`, payment: `${amt} milale. Dhanyavaad!`, return: `${amt} cha maal parat ghetla`, charge: `${amt} kharcha jodla`, discount: `${amt} chi savalat dili`,
       edited: "Ek entry sudharli", cancelled: "Ek entry radd keli",
       due: `Baaki: ${bal}`, adv: `Tumcha advance: ${bal}`, clear: "Hisaab clear aahe", tap: "Statement pahaNyasathi daba.",
     },
