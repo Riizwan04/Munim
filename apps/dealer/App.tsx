@@ -1,3 +1,4 @@
+import { PhoneFrame } from "./src/PhoneFrame";
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Platform, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -169,9 +170,11 @@ export default function App() {
   }, []);
   return (
     <ThemeProvider>
-      {!fonts && !waited ? <Splash /> : token
-        ? <SafeAreaProvider><SafeAreaView style={{ flex: 1 }}><PublicStatement token={token} /></SafeAreaView></SafeAreaProvider>
-        : <I18nProvider><AppInner /></I18nProvider>}
+      <PhoneFrame>
+        {!fonts && !waited ? <Splash /> : token
+          ? <SafeAreaProvider><SafeAreaView style={{ flex: 1 }}><PublicStatement token={token} /></SafeAreaView></SafeAreaProvider>
+          : <I18nProvider><AppInner /></I18nProvider>}
+      </PhoneFrame>
     </ThemeProvider>
   );
 }
