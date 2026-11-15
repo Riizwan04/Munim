@@ -6,6 +6,7 @@ import { localToday } from "./dates";
 import { rs, rupee } from "./money";
 import { sendWhatsApp, shareText, sharePdf } from "./share";
 import { useI18n } from "./i18n";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Row, Section } from "./ui";
 
@@ -28,7 +29,7 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
   const [siteId, setSiteId] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>((["hi", "mr", "en"].includes(party.language) ? party.language : "hi") as Lang);
   const [note, setNote] = useState("");
-  useEffect(() => { loadStatementData(party.id).then(setData).catch((e) => setErr(e.message)); }, [party.id]);
+  useEffect(() => { loadStatementData(party.id).then(setData).catch((e) => setErr(fe(e))); }, [party.id]);
 
   const stmt = useMemo(() => data && buildStatement({
     businessName: data.businessName, partyName: party.name, opening: party.opening, entries: data.entries,
@@ -39,7 +40,7 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
   if (err) return <Text style={{ color: t.due, padding: 16 }}>{err}</Text>;
   if (!data || !stmt) return <ActivityIndicator style={{ flex: 1 }} />;
   const text = statementText(stmt);
-  const run = async (fn: () => Promise<unknown>, done: string) => { try { await fn(); setNote(done); } catch (e: any) { setNote(e.message ?? String(e)); } };
+  const run = async (fn: () => Promise<unknown>, done: string) => { try { await fn(); setNote(done); } catch (e: any) { setNote(fe(e)); } };
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>

@@ -3,6 +3,7 @@ import { ScrollView, Text } from "react-native";
 import { parseRupees } from "@munim/ledger-core";
 import { updateParty, type PartyRow } from "./data";
 import { useI18n } from "./i18n";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 
@@ -37,7 +38,7 @@ export function PartyEdit({ party, onBack, onSaved }: { party: PartyRow; onBack:
         try {
           await updateParty(party.id, { name: name.trim(), phone: phone.trim(), nicknames: nick.split(",").map((x) => x.trim()).filter(Boolean), creditLimit: lim, opening: open!, language: lang });
           onSaved();
-        } catch (e: any) { setErr(e.message); }
+        } catch (e: any) { setErr(fe(e)); }
       }} /></Row>
     </ScrollView>
   );

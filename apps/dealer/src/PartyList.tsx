@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import type { Overview, PartyRow } from "./data";
 import { rupee } from "./money";
-import { supabase } from "./supabase";
+import { requestSignOut } from "./offline/signout";
 import { useI18n } from "./i18n";
 import { FONT, useTheme } from "./theme";
 
@@ -15,6 +15,7 @@ export function PartyList({ data, err, onOpen, onAdd, onVoice, onSettings, onRef
   const t = useTheme();
   const { tr, trn } = useI18n();
   const [refreshing, setRefreshing] = useState(false);
+  const [note, setNote] = useState("");
   const [sort, setSort] = useState<Sort>("balance");
   const [q, setQ] = useState("");
   const list = useMemo(() => {
@@ -76,8 +77,9 @@ export function PartyList({ data, err, onOpen, onAdd, onVoice, onSettings, onRef
           </Pressable>
         )}
       />
+      {note ? <Text style={{ color: t.due, fontSize: FONT.small, paddingHorizontal: 16 }}>{note}</Text> : null}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, gap: 8 }}>
-        <Pressable onPress={() => supabase.auth.signOut()} style={{ padding: 12 }}>
+        <Pressable onPress={async () => { if (!(await requestSignOut())) setNote(tr("offline.logoutBlocked")); }} style={{ padding: 12 }}>
           <Text style={{ color: t.muted, fontSize: FONT.small }}>{tr("common.logout")}</Text>
         </Pressable>
         <View style={{ flexDirection: "row", gap: 8 }}>

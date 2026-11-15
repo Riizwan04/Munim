@@ -6,6 +6,7 @@ import { localToday } from "./dates";
 import { useI18n, type Key } from "./i18n";
 import { rs, rupee } from "./money";
 import { shareFile, sharePdf, shareText } from "./share";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Row, Section } from "./ui";
 
@@ -26,14 +27,14 @@ export function Reports({ onImport }: { onImport: () => void }) {
   const [err, setErr] = useState("");
   const [period, setPeriod] = useState<Period>("month");
   const [note, setNote] = useState("");
-  useEffect(() => { loadReportData().then(setData).catch((e) => setErr(e.message ?? String(e))); }, []);
+  useEffect(() => { loadReportData().then(setData).catch((e) => setErr(fe(e))); }, []);
 
   const rep: Report | null = useMemo(() => data && buildReport({ parties: data.parties, entries: data.entries, materials: data.materials, sites: data.sites, ...range(period) }), [data, period]);
   if (err) return <Text style={{ color: t.due, padding: 16 }}>{err}</Text>;
   if (!data || !rep) return <ActivityIndicator style={{ flex: 1 }} />;
 
   const s = rep.summary;
-  const run = async (fn: () => Promise<unknown>) => { try { await fn(); setNote(tr("rp.exported")); } catch (e: any) { setNote(e.message ?? String(e)); } };
+  const run = async (fn: () => Promise<unknown>) => { try { await fn(); setNote(tr("rp.exported")); } catch (e: any) { setNote(fe(e)); } };
   const stamp = localToday();
   const card = { borderWidth: 2, borderColor: t.line, borderRadius: 12, backgroundColor: t.surface, overflow: "hidden" as const };
   const line = (left: string, right: string, opts: { bold?: boolean; color?: string; sub?: string } = {}) => (

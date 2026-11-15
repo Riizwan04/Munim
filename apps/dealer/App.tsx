@@ -12,6 +12,10 @@ import { Statement } from "./src/Statement";
 import { Settings } from "./src/Settings";
 import { Reports } from "./src/Reports";
 import { Import } from "./src/Import";
+import { SyncBanner } from "./src/SyncBanner";
+import { SyncIssues } from "./src/SyncIssues";
+import { setCacheUser } from "./src/offline/cache";
+import { onSynced, startOutbox, stopOutbox } from "./src/offline/outbox";
 import { I18nProvider, useI18n } from "./src/i18n";
 import { Reminders } from "./src/Reminders";
 import { Onboarding } from "./src/Onboarding";
@@ -23,6 +27,7 @@ import type { ResolvedEntry } from "@munim/ledger-core";
 import { PartyList } from "./src/PartyList";
 import { loadParties, type Overview, type PartyRow } from "./src/data";
 import { configProblems, supabase } from "./src/supabase";
+import { fe } from "./src/errors";
 import { useTheme } from "./src/theme";
 
 type PartyRef2 = PartyRow;
@@ -33,6 +38,7 @@ type Screen =
   | { name: "items" }
   | { name: "reports" }
   | { name: "import" }
+  | { name: "sync" }
   | { name: "settings" }
   | { name: "reminders"; only?: PartyRow }
   | { name: "statement"; party: PartyRow }
@@ -51,13 +57,20 @@ function AppInner() {
   const [queue, setQueue] = useState<{ items: ResolvedEntry[]; i: number; text: string } | null>(null);
 
   const refresh = useCallback(async () => {
-    try { setData(await loadParties()); setErr(""); } catch (e: any) { setErr(e.message ?? String(e)); }
+    try { setData(await loadParties()); setErr(""); } catch (e: any) { setErr(fe(e)); }
   }, []);
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_e, s) => { setSession(s); if (!s) { setScreen({ name: "parties" }); setData(null); } });
     return () => data.subscription.unsubscribe();
   }, []);
+  // Offline support: the cache and the outbox belong to the signed-in user.
+  const uid = session?.user.id ?? null;
+  useEffect(() => {
+    setCacheUser(uid);
+    if (uid) void startOutbox(uid); else stopOutbox();
+  }, [uid]);
+  useEffect(() => onSynced(() => { void refresh(); setRev((n) => n + 1); }), [refresh]);
   useEffect(() => { if (session) refresh(); }, [session, refresh]);
 
   // After a voice entry is saved or skipped: go to the next entry from the same sentence, else back to the ledger.
@@ -87,6 +100,7 @@ function AppInner() {
   else if (screen.name === "reminders" && data)
     body = <Reminders businessId={data.businessId} business={data.business} parties={data.parties} only={screen.only}
       onClose={async () => { await refresh(); setScreen(screen.only ? { name: "ledger", party: screen.only } : { name: "parties" }); }} />;
+  else if (screen.name === "sync" && data) body = <SyncIssues parties={data.parties} onBack={() => setScreen({ name: "parties" })} />;
   else if (screen.name === "import" && data) body = <Import businessId={data.businessId} parties={data.parties} onClose={() => setScreen({ name: "reports" })} onDone={() => { refresh(); setRev((n) => n + 1); }} />;
   else if (screen.name === "reports") body = <Reports key={rev} onImport={() => setScreen({ name: "import" })} />;
   else if (screen.name === "settings") body = <Settings onBack={() => setScreen({ name: "parties" })} />;
@@ -116,6 +130,7 @@ function AppInner() {
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
         <StatusBar style="auto" />
+        {session && data?.businessId && screen.name !== "sync" ? <SyncBanner onOpen={() => setScreen({ name: "sync" })} /> : null}
         <View style={{ flex: 1 }}>{body}</View>
         {session && data?.businessId && (screen.name === "parties" || screen.name === "items" || screen.name === "reports" || (screen.name === "reminders" && !screen.only)) ? (
           <View style={{ flexDirection: "row", borderTopWidth: 1, borderColor: t.line, backgroundColor: t.surface }}>

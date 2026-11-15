@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native
 import { COMMON_UNITS } from "@munim/ledger-core";
 import { loadMaterialsFull, saveMaterial, type MaterialFull } from "./data";
 import { useI18n } from "./i18n";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 
@@ -13,7 +14,7 @@ export function Items({ businessId }: { businessId: string }) {
   const [items, setItems] = useState<MaterialFull[] | null>(null);
   const [edit, setEdit] = useState<{ id?: string; name: string; category: string; units: string[]; local: string } | null>(null);
   const [err, setErr] = useState("");
-  const load = useCallback(() => loadMaterialsFull().then(setItems).catch((e) => setErr(e.message)), []);
+  const load = useCallback(() => loadMaterialsFull().then(setItems).catch((e) => setErr(fe(e))), []);
   useEffect(() => { load(); }, [load]);
   if (!items) return err ? <Text style={{ color: t.due, padding: 16 }}>{err}</Text> : <ActivityIndicator style={{ flex: 1 }} />;
 
@@ -36,7 +37,7 @@ export function Items({ businessId }: { businessId: string }) {
             try {
               await saveMaterial(businessId, { id: edit.id, name: edit.name.trim(), category: edit.category.trim(), units: edit.units, localNames: edit.local.split(",").map((x) => x.trim()).filter(Boolean) });
               setEdit(null); setErr(""); load();
-            } catch (e: any) { setErr(e.message); }
+            } catch (e: any) { setErr(fe(e)); }
           }} />
           <Btn kind="ghost" label={tr("common.nevermind")} onPress={() => { setEdit(null); setErr(""); }} />
         </Row>

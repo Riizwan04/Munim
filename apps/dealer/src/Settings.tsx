@@ -1,6 +1,7 @@
 import { ScrollView, Text } from "react-native";
 import { LANGS, useI18n } from "./i18n";
-import { supabase } from "./supabase";
+import { useState } from "react";
+import { requestSignOut } from "./offline/signout";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Row, Section } from "./ui";
 
@@ -8,6 +9,7 @@ import { Btn, Chip, Row, Section } from "./ui";
 export function Settings({ onBack }: { onBack: () => void }) {
   const t = useTheme();
   const { tr, ui, asst, setUi, setAsst } = useI18n();
+  const [note, setNote] = useState("");
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, gap: 20 }}>
       <Text onPress={onBack} accessibilityRole="button" style={{ fontSize: FONT.body, color: t.accent, fontWeight: "600" }}>‹ {tr("common.back")}</Text>
@@ -20,7 +22,8 @@ export function Settings({ onBack }: { onBack: () => void }) {
         <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("set.note")}</Text>
       </Section>
       <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("set.msgNote")}</Text>
-      <Row wrap={false}><Btn kind="ghost" label={tr("common.logout")} onPress={() => supabase.auth.signOut()} /></Row>
+      {note ? <Text style={{ color: t.due, fontSize: FONT.small }}>{note}</Text> : null}
+      <Row wrap={false}><Btn kind="ghost" label={tr("common.logout")} onPress={async () => { if (!(await requestSignOut())) setNote(tr("offline.logoutBlocked")); }} /></Row>
     </ScrollView>
   );
 }

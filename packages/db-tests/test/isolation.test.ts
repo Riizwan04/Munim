@@ -121,3 +121,55 @@ run("Supabase: isolation and ledger writes", () => {
     expect((await B.db.from("audit_log").select("id")).data).toEqual([]);
   });
 });
+
+// Needs migration 0004 (client_id). Uploading the same entry twice must never create two entries.
+run("Supabase: offline uploads are idempotent (migration 0004)", () => {
+  let A: Tenant;
+  let migrated = false; // true once migration 0004 has been run in Supabase
+  beforeAll(async () => {
+    A = await tenant("idem");
+    migrated = !(await A.db.from("entries").select("client_id").limit(1)).error;
+    if (!migrated) console.warn("Migration 0004 is not applied yet: skipping the idempotency checks.");
+  }, 60_000);
+  const withId = (id: string, bags: number) => ({ ...salePayload(A, bags, 360), client_id: id });
+  const newId = () => crypto.randomUUID();
+
+  it("the same client_id twice returns the same entry, and stores one", async () => {
+    if (!migrated) return;
+    const id = newId();
+    const first = await A.db.rpc("save_entry", { p: withId(id, 10) });
+    const second = await A.db.rpc("save_entry", { p: withId(id, 10) });
+    expect(first.error).toBeNull();
+    expect(second.error).toBeNull();
+    expect(second.data).toBe(first.data);
+    const rows = await A.db.from("entries").select("id").eq("client_id", id);
+    expect(rows.data).toHaveLength(1);
+    const audit = await A.db.from("audit_log").select("id").eq("entry_id", first.data).eq("action", "create");
+    expect(audit.data).toHaveLength(1);
+  });
+  it("two uploads at the same moment still make one entry", async () => {
+    if (!migrated) return;
+    const id = newId();
+    const [x, y] = await Promise.all([A.db.rpc("save_entry", { p: withId(id, 5) }), A.db.rpc("save_entry", { p: withId(id, 5) })]);
+    expect(x.error).toBeNull();
+    expect(y.error).toBeNull();
+    expect(x.data).toBe(y.data);
+    expect((await A.db.from("entries").select("id").eq("client_id", id)).data).toHaveLength(1);
+  });
+  it("different client_ids are different entries; no client_id still works", async () => {
+    if (!migrated) return;
+    const a = await A.db.rpc("save_entry", { p: withId(newId(), 1) });
+    const b = await A.db.rpc("save_entry", { p: withId(newId(), 1) });
+    const c = await A.db.rpc("save_entry", { p: salePayload(A, 1, 360) });
+    expect(new Set([a.data, b.data, c.data]).size).toBe(3);
+  });
+  it("another business cannot upload into this one using the same client_id", async () => {
+    if (!migrated) return;
+    const B2 = await tenant("idem2");
+    const id = newId();
+    await A.db.rpc("save_entry", { p: withId(id, 1) });
+    const r = await B2.db.rpc("save_entry", { p: { ...salePayload(B2, 1, 360), client_id: id } });
+    expect(r.error).toBeNull(); // unique per business: B2 gets its own entry
+    expect((await B2.db.from("entries").select("id").eq("client_id", id)).data).toHaveLength(1);
+  });
+});

@@ -6,6 +6,7 @@ import { createPartyWithOpening, loadImportContext, saveEntry, scanPagePhoto, ty
 import { localToday } from "./dates";
 import { useI18n, type Key } from "./i18n";
 import { rupee } from "./money";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 
@@ -53,7 +54,7 @@ export function Import({ businessId, parties, onClose, onDone }: { businessId: s
     if (pick.canceled || !pick.assets[0]?.base64) return;
     setBusy(true);
     try { read(await scanPagePhoto(pick.assets[0].base64, pick.assets[0].mimeType ?? "image/jpeg")); }
-    catch (e: any) { setErr(tr("im.scanFail", { err: e.message ?? String(e) })); }
+    catch (e: any) { setErr(tr("im.scanFail", { err: fe(e) })); }
     setBusy(false);
   }
 
@@ -68,10 +69,10 @@ export function Import({ businessId, parties, onClose, onDone }: { businessId: s
       for (let k = 0; k < toImport.length; k++) {
         setProgress({ i: k + 1, n: toImport.length });
         try { await saveEntry({ ...toImport[k]!.payload!, party_id: pid! }); ok++; }
-        catch (e: any) { setResult({ ok, failedAt: k + 1, error: e.message ?? String(e) }); setStep("done"); onDone(); return; }
+        catch (e: any) { setResult({ ok, failedAt: k + 1, error: fe(e) }); setStep("done"); onDone(); return; }
       }
       setResult({ ok }); setStep("done"); onDone();
-    } catch (e: any) { setResult({ ok, failedAt: 0, error: e.message ?? String(e) }); setStep("done"); onDone(); }
+    } catch (e: any) { setResult({ ok, failedAt: 0, error: fe(e) }); setStep("done"); onDone(); }
   }
 
   const head = (

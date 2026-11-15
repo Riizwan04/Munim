@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-nati
 import { loadLedger, type LedgerRow, type PartyRow } from "./data";
 import { rs, rupee } from "./money";
 import { useI18n } from "./i18n";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 
 // Notebook layout (Layout A): Date | Item | Qty | Rate | Amount | Site — same as the paper khata, plus Rate.
@@ -15,7 +16,7 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement,
   const itemLabel = (it: string) => (it === "@balance" ? tr("row.balance") : it === "@total" ? tr("row.total") : it.startsWith("@mode:") ? tr(`mode.${it.slice(6)}` as never) : it === "@charge" ? tr("row.charge") : it === "@discount" ? tr("row.discount") : it === "@return" ? tr("row.return") : it);
   const [rows, setRows] = useState<LedgerRow[] | null>(null);
   const [err, setErr] = useState("");
-  useEffect(() => { loadLedger(party).then(setRows).catch((e) => setErr(e.message ?? String(e))); }, [party]);
+  useEffect(() => { loadLedger(party).then(setRows).catch((e) => setErr(fe(e))); }, [party]);
   const total = rows?.[rows.length - 1]?.amount ?? party.balance;
   const cell = (w: number | undefined, right = false) => ({ ...(w ? { width: w } : { flex: 1, minWidth: 0 }),  paddingHorizontal: 5, paddingVertical: 11, justifyContent: "center" as const, alignItems: right ? ("flex-end" as const) : ("flex-start" as const) });
   const txt = (color: string, bold = false, size: number = FONT.body) => ({ color, fontSize: size, fontWeight: bold ? ("700" as const) : ("400" as const), fontVariant: ["tabular-nums" as const] });
@@ -70,6 +71,7 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement,
                   <View style={cell(undefined)}>
                     <Text style={txt(color, isBal || isPay, fs + 1)}>{itemLabel(r.item)}</Text>
                     {r.site ? <Text style={txt(t.muted, false, 13)}>{r.site}</Text> : null}
+                    {r.pending ? <Text style={txt(t.muted, false, 13)}>⏳ {tr("row.pending")}</Text> : null}
                   </View>
                   <View style={cell(W.qty, true)}><Text numberOfLines={1} style={txt(color, false, fs)}>{r.qty ?? ""}</Text></View>
                   <View style={cell(W.rate, true)}><Text numberOfLines={1} style={txt(color, false, fs)}>{r.rate !== undefined ? rs(r.rate) : ""}</Text></View>

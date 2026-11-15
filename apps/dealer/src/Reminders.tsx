@@ -5,6 +5,7 @@ import { loadReminderLog, logReminder, type PartyRow } from "./data";
 import { rupee } from "./money";
 import { sendWhatsApp } from "./share";
 import { useI18n } from "./i18n";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Row } from "./ui";
 
@@ -123,7 +124,7 @@ function Queue({ business, businessId, people, onDone, onBack }: { business: str
       {warn ? <Text style={{ color: t.due, fontSize: FONT.small }}>{warn}</Text> : null}
       {!opened ? (
         <Row wrap={false}>
-          <Btn label={tr("rem.send")} onPress={async () => { try { await sendWhatsApp(p.phone, text); setOpened(true); } catch (e: any) { setWarn(e.message ?? String(e)); } }} />
+          <Btn label={tr("rem.send")} onPress={async () => { try { await sendWhatsApp(p.phone, text); setOpened(true); } catch (e: any) { setWarn(fe(e)); } }} />
           <Btn kind="ghost" label={tr("common.skip")} onPress={() => next(false)} />
         </Row>
       ) : (

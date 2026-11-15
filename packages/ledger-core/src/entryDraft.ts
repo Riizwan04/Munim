@@ -27,6 +27,8 @@ export interface DraftInput {
 export interface EntryPayload {
   business_id: string; party_id: string; site_id: string | null; type: EntryType; entry_date: string;
   amount: Paise; payment_mode: PaymentMode | null; source: "voice" | "manual"; transcript: string | null;
+  /** Unique id made on the phone so a retried upload can never create the entry twice (migration 0004). */
+  client_id?: string;
   lines: { material_id: string; quantity: MilliQty; unit: string; rate: Paise; gst_bp: number | null; line_total: Paise }[];
 }
 export type DraftIssueCode = "date" | "items" | "item" | "unit" | "qty" | "rate" | "amount" | "mode";

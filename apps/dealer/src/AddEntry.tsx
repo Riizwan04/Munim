@@ -7,6 +7,9 @@ import {
 import { createParty, createSite, editEntry, loadEntry, loadMaterials, loadPartyContext, saveEntry, type PartyRow } from "./data";
 import { localToday } from "./dates";
 import { rupee } from "./money";
+import { fe } from "./errors";
+import { discardItem, enqueueEntry, getItems, syncNow } from "./offline/outbox";
+import { useReachable } from "./offline/net";
 import { useI18n, type Key } from "./i18n";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
@@ -41,6 +44,7 @@ interface Props {
 export function AddEntry({ businessId, parties, initialParty, editingId, onDone, onCancel, prefill, transcript, queuePos, onSkip }: Props) {
   const t = useTheme();
   const { tr, ta } = useI18n();
+  const online = useReachable();
   const [materials, setMaterials] = useState<MaterialRef[]>([]);
   const [party, setParty] = useState<PartyRow | undefined>(initialParty);
   const [ctx, setCtx] = useState<{ sites: { id: string; name: string }[]; entries: Entry[] }>({ sites: [], entries: [] });
@@ -71,8 +75,8 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
     if (unk && unk.kind === "party") setNewParty({ name: (unk.spoken ?? "").replace(/\b\w/g, (c) => c.toUpperCase()), phone: "" });
     setTouched(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { loadMaterials().then(setMaterials).catch((e) => setErr(e.message)); }, []);
-  useEffect(() => { if (party) loadPartyContext(party.id).then(setCtx).catch((e) => setErr(e.message)); }, [party]);
+  useEffect(() => { loadMaterials().then(setMaterials).catch((e) => setErr(fe(e))); }, []);
+  useEffect(() => { if (party) loadPartyContext(party.id).then(setCtx).catch((e) => setErr(fe(e))); }, [party]);
   useEffect(() => {
     if (!editingId) return;
     loadEntry(editingId).then((d) => {
@@ -80,7 +84,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
       setAmount(d.lines.length ? "" : String(d.amount / 100)); setMode((d.paymentMode as PaymentMode) ?? null);
       setLines(d.lines.length ? d.lines.map((l) => ({ materialId: l.materialId, unit: l.unit, qty: String(l.qty / 1000), rate: String(l.rate / 100) })) : [blank()]);
       setPick(null);
-    }).catch((e) => setErr(e.message));
+    }).catch((e) => setErr(fe(e)));
   }, [editingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isItems = type === "sale";
@@ -120,10 +124,16 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
     if (!draft?.payload) return;
     setBusy(true); setErr("");
     try {
-      if (editingId) await editEntry(editingId, draft.payload, reason.trim());
-      else await saveEntry(draft.payload);
+      if (editingId) await editEntry(editingId, draft.payload, reason.trim()); // edits need the server
+      else {
+        // New entries go to the phone's outbox first (safe even with no signal), then upload.
+        const item = await enqueueEntry(draft.payload);
+        await syncNow({ timeoutMs: 6000 });
+        const now = getItems().find((i) => i.id === item.id);
+        if (now?.status === "failed") { await discardItem(item.id); throw new Error(now.error ?? "rejected"); } // server said no: fix it here
+      }
       onDone(party);
-    } catch (e: any) { setErr(e.message ?? String(e)); setBusy(false); }
+    } catch (e: any) { setErr(fe(e)); setBusy(false); }
   }
 
   const needReason = !!editingId && reason.trim() === "";
@@ -153,7 +163,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
           <Section title={tr("add.party")}>
             <Row>
               {partyList.map((p) => <Chip key={p.id} label={p.name} on={party?.id === p.id} onPress={() => { if (!editingId) { setParty(p); setSiteId(null); } }} />)}
-              {!editingId && <Chip label={tr("add.newParty")} onPress={() => setNewParty({ name: "", phone: "" })} />}
+              {!editingId && <Chip label={tr("add.newParty")} onPress={() => (online ? setNewParty({ name: "", phone: "" }) : setErr(tr("offline.newPartyOffline")))} />}
             </Row>
             {newParty && (
               <View style={{ gap: 8 }}>
@@ -164,7 +174,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
                     const id = await createParty(businessId, newParty.name.trim(), newParty.phone.trim());
                     const p: PartyRow = { id, name: newParty.name.trim(), phone: newParty.phone.trim(), opening: 0, balance: 0, creditLimit: null, nicknames: [], language: "hi", overdueDays: null };
                     setPartyList([...partyList, p]); setParty(p); setNewParty(null);
-                  } catch (e: any) { setErr(e.message); }
+                  } catch (e: any) { setErr(fe(e)); }
                 }} /><Btn kind="ghost" label={tr("common.nevermind")} onPress={() => setNewParty(null)} /></Row>
               </View>
             )}
@@ -180,7 +190,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
                 <Row>
                   <Chip label={tr("common.none")} on={siteId === null} onPress={() => setSiteId(null)} />
                   {ctx.sites.map((s) => <Chip key={s.id} label={s.name} on={siteId === s.id} onPress={() => setSiteId(s.id)} />)}
-                  <Chip label={tr("add.newSite")} onPress={() => setNewSite("")} />
+                  <Chip label={tr("add.newSite")} onPress={() => (online ? setNewSite("") : setErr(tr("offline.newPartyOffline")))} />
                 </Row>
                 {newSite !== null && (
                   <Row wrap={false}>
@@ -188,7 +198,7 @@ export function AddEntry({ businessId, parties, initialParty, editingId, onDone,
                     <View style={{ justifyContent: "flex-end" }}>
                       <Btn label={tr("common.add")} disabled={!newSite.trim()} onPress={async () => {
                         try { const id = await createSite(businessId, party.id, newSite.trim()); setCtx({ ...ctx, sites: [...ctx.sites, { id, name: newSite.trim() }] }); setSiteId(id); setNewSite(null); }
-                        catch (e: any) { setErr(e.message); }
+                        catch (e: any) { setErr(fe(e)); }
                       }} />
                     </View>
                   </Row>

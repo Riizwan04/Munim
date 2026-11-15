@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { cancelEntry, loadEntry, type EntryDetail as Detail, type PartyRow } from "./data";
 import { rupee } from "./money";
 import { useI18n } from "./i18n";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Field, Row } from "./ui";
 import { entryMessage, lineText, type Lang } from "@munim/ledger-core";
@@ -17,7 +18,7 @@ export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { ent
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { loadEntry(entryId).then(setD).catch((e) => setErr(e.message)); }, [entryId]);
+  useEffect(() => { loadEntry(entryId).then(setD).catch((e) => setErr(fe(e))); }, [entryId]);
   if (!d) return err ? <Text style={{ color: t.due, padding: 16 }}>{err}</Text> : <ActivityIndicator style={{ marginTop: 40 }} />;
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -41,7 +42,7 @@ export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { ent
                 paymentMode: (d.paymentMode as any) ?? undefined, newBalance: party.balance,
               });
               await sendWhatsApp(party.phone, msg);
-            } catch (e: any) { setErr(e.message ?? String(e)); }
+            } catch (e: any) { setErr(fe(e)); }
           }} /></Row>
         )}
         {d.status === "active" && !cancelling && <Row wrap={false}><Btn kind="ghost" label={tr("detail.edit")} onPress={onEdit} /><Btn kind="danger" label={tr("detail.cancelEntry")} onPress={() => setCancelling(true)} /></Row>}
@@ -50,7 +51,7 @@ export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { ent
             <Field label={tr("detail.cancelReason")} nativeID="cancel-reason" value={reason} onChangeText={setReason} />
             <Text style={{ color: t.muted, fontSize: FONT.small }}>{tr("detail.cancelNote")}</Text>
             {busy ? <ActivityIndicator /> : <Row wrap={false}>
-              <Btn kind="danger" label={tr("detail.confirmCancel")} disabled={!reason.trim()} onPress={async () => { setBusy(true); try { await cancelEntry(d.id, reason.trim()); onChanged(); } catch (e: any) { setErr(e.message); setBusy(false); } }} />
+              <Btn kind="danger" label={tr("detail.confirmCancel")} disabled={!reason.trim()} onPress={async () => { setBusy(true); try { await cancelEntry(d.id, reason.trim()); onChanged(); } catch (e: any) { setErr(fe(e)); setBusy(false); } }} />
               <Btn kind="ghost" label={tr("common.no")} onPress={() => setCancelling(false)} />
             </Row>}
           </View>

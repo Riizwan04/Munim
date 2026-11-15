@@ -4,6 +4,7 @@ import { heuristicUnderstand, resolveUtterance, type ResolvedEntry } from "@muni
 import { loadUnderstandContext } from "./data";
 import { supabase } from "./supabase";
 import { useI18n } from "./i18n";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Row } from "./ui";
 
@@ -16,7 +17,7 @@ export function Voice({ onResolved, onCancel }: { onResolved: (entries: Resolved
   const [text, setText] = useState("");
   const [ctx, setCtx] = useState<Awaited<ReturnType<typeof loadUnderstandContext>> | null>(null);
   const [err, setErr] = useState("");
-  useEffect(() => { loadUnderstandContext().then(setCtx).catch((e) => setErr(e.message)); }, []);
+  useEffect(() => { loadUnderstandContext().then(setCtx).catch((e) => setErr(fe(e))); }, []);
 
   async function go() {
     if (!ctx) return;

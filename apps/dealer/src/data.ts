@@ -1,5 +1,7 @@
-import { partyStats, getPreset, partyBalance, entryEffect, type Entry, type EntryPayload, type MaterialRef, type PartyRef, type EntryType } from "@munim/ledger-core";
+import { partyStats, getPreset, partyBalance, entryEffect, pendingAsEntries, type Entry, type EntryPayload, type MaterialRef, type PartyRef, type EntryType } from "@munim/ledger-core";
 import { localToday } from "./dates";
+import { getItems } from "./offline/outbox";
+import { withCache } from "./offline/cache";
 import { supabase } from "./supabase";
 
 export interface PartyRow {
@@ -9,7 +11,7 @@ export interface PartyRow {
 export interface Overview { businessId: string; business: string; parties: PartyRow[]; todaySales: number; todayCollections: number }
 export interface LedgerRow {
   key: string; entryId?: string; kind: "balance" | "line" | "payment" | "charge" | "total";
-  date?: string; item: string; qty?: string; rate?: number; amount: number; site?: string;
+  date?: string; item: string; qty?: string; rate?: number; amount: number; site?: string; pending?: boolean;
 }
 
 const toEntry = (r: any): Entry => ({
@@ -20,15 +22,22 @@ const toEntry = (r: any): Entry => ({
 });
 
 export async function loadParties(): Promise<Overview> {
-  const [b, p, e] = await Promise.all([
-    supabase.from("businesses").select("id,name").limit(1).maybeSingle(),
-    supabase.from("parties").select("id,name,phone,opening_balance,credit_limit,nicknames,preferred_language"),
-    supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,entry_lines(material_id,quantity,unit,rate,gst_bp)"),
-  ]);
-  if (p.error) throw p.error;
-  if (e.error) throw e.error;
+  const raw = await withCache("overview", async () => {
+    const [b, p, e] = await Promise.all([
+      supabase.from("businesses").select("id,name").limit(1).maybeSingle(),
+      supabase.from("parties").select("id,name,phone,opening_balance,credit_limit,nicknames,preferred_language"),
+      supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,entry_lines(material_id,quantity,unit,rate,gst_bp)"),
+    ]);
+    if (b.error) throw b.error;
+    if (p.error) throw p.error;
+    if (e.error) throw e.error;
+    return { b: b.data, p: p.data ?? [], e: e.data ?? [] };
+  });
+  const b = { data: raw.b }, p = { data: raw.p }, e = { data: raw.e };
   const byParty = new Map<string, Entry[]>();
   for (const r of e.data ?? []) (byParty.get(r.party_id) ?? byParty.set(r.party_id, []).get(r.party_id)!).push(toEntry(r));
+  // entries saved on this phone but not uploaded yet count straight away
+  for (const en of pendingAsEntries(getItems())) (byParty.get(en.partyId) ?? byParty.set(en.partyId, []).get(en.partyId)!).push(en);
   const today = localToday();
   let todaySales = 0, todayCollections = 0;
   const parties: PartyRow[] = (p.data ?? []).map((x) => {
@@ -47,12 +56,24 @@ const trim = (n: number) => String(Math.round(n * 1000) / 1000);
 
 /** Builds the notebook-style rows (Layout A): opening balance, entries, balance after each payment, final total. */
 export async function loadLedger(party: PartyRow): Promise<LedgerRow[]> {
-  const [e, s] = await Promise.all([
-    supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,created_at,entry_lines(material_id,quantity,unit,rate,gst_bp,line_total,materials(name))").eq("party_id", party.id).eq("status", "active").order("entry_date").order("created_at"),
-    supabase.from("sites").select("id,name").eq("party_id", party.id),
-  ]);
-  if (e.error) throw e.error;
-  const sites = new Map((s.data ?? []).map((x) => [x.id, x.name]));
+  const raw = await withCache(`ledger:${party.id}`, async () => {
+    const [e, s] = await Promise.all([
+      supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,created_at,entry_lines(material_id,quantity,unit,rate,gst_bp,line_total,materials(name))").eq("party_id", party.id).eq("status", "active").order("entry_date").order("created_at"),
+      supabase.from("sites").select("id,name").eq("party_id", party.id),
+    ]);
+    if (e.error) throw e.error;
+    return { e: e.data ?? [], s: s.data ?? [] };
+  });
+  const names = new Map((await loadMaterials().catch(() => [] as MaterialRef[])).map((m) => [m.id, m.name]));
+  const pendingRaw = getItems().filter((i) => i.status === "pending" && i.payload.party_id === party.id).map((i) => ({
+    id: i.id, party_id: i.payload.party_id, site_id: i.payload.site_id, type: i.payload.type, entry_date: i.payload.entry_date, status: "active",
+    amount: i.payload.amount, payment_mode: i.payload.payment_mode, cheque_bounced: false, created_at: i.createdAt, pending: true,
+    entry_lines: i.payload.lines.map((l) => ({ material_id: l.material_id, quantity: l.quantity, unit: l.unit, rate: l.rate, gst_bp: null, line_total: l.line_total, materials: { name: names.get(l.material_id) ?? "Item" } })),
+  }));
+  const all: any[] = [...raw.e, ...pendingRaw].sort((x, y) => (x.entry_date === y.entry_date ? (String(x.created_at) < String(y.created_at) ? -1 : 1) : x.entry_date < y.entry_date ? -1 : 1));
+  const e = { data: all };
+  const s = { data: raw.s };
+  const sites = new Map((s.data ?? []).map((x: any) => [x.id, x.name]));
   const rows: LedgerRow[] = [{ key: "open", kind: "balance", item: "@balance", amount: party.opening }];
   let running = party.opening;
   for (const r of e.data ?? []) {
@@ -61,17 +82,17 @@ export async function loadLedger(party: PartyRow): Promise<LedgerRow[]> {
     const site = r.site_id ? sites.get(r.site_id) : undefined;
     const date = r.entry_date.slice(8, 10) + "-" + r.entry_date.slice(5, 7);
     if (r.type === "payment") {
-      rows.push({ key: r.id, entryId: r.id, kind: "payment", date, item: `@mode:${r.payment_mode ?? "paid"}`, amount: eff, site });
+      rows.push({ key: r.id, entryId: r.pending ? undefined : r.id, pending: r.pending, kind: "payment", date, item: `@mode:${r.payment_mode ?? "paid"}`, amount: eff, site });
       running += eff;
       rows.push({ key: r.id + "b", kind: "balance", item: "@balance", amount: running });
       continue;
     }
     if (r.entry_lines?.length) {
       (r.entry_lines as any[]).forEach((l, i) =>
-        rows.push({ key: r.id + i, entryId: r.id, kind: "line", date: i === 0 ? date : undefined, item: l.materials?.name ?? "Item",
+        rows.push({ key: r.id + i, entryId: r.pending ? undefined : r.id, pending: r.pending, kind: "line", date: i === 0 ? date : undefined, item: l.materials?.name ?? "Item",
           qty: `${trim(Number(l.quantity) / 1000)} ${l.unit}`, rate: Number(l.rate), amount: Number(l.line_total), site: i === 0 ? site : undefined }));
     } else {
-      rows.push({ key: r.id, entryId: r.id, kind: "charge", date, item: `@${r.type}`, amount: eff, site });
+      rows.push({ key: r.id, entryId: r.pending ? undefined : r.id, pending: r.pending, kind: "charge", date, item: `@${r.type}`, amount: eff, site });
     }
     running += eff;
   }
@@ -80,20 +101,26 @@ export async function loadLedger(party: PartyRow): Promise<LedgerRow[]> {
 }
 
 export async function loadMaterials(): Promise<MaterialRef[]> {
-  const r = await supabase.from("materials").select("id,name,category,local_names,units").order("category").order("name");
-  if (r.error) throw r.error;
-  return (r.data ?? []).map((m) => ({ id: m.id, name: m.name, category: m.category, localNames: m.local_names ?? [], units: m.units }));
+  const rows = await withCache("materials", async () => {
+    const r = await supabase.from("materials").select("id,name,category,local_names,units").order("category").order("name");
+    if (r.error) throw r.error;
+    return r.data ?? [];
+  });
+  return rows.map((m: any) => ({ id: m.id, name: m.name, category: m.category, localNames: m.local_names ?? [], units: m.units }));
 }
 
 /** A party's sites and active past entries (used for "last rate" hints and balance preview). */
 export async function loadPartyContext(partyId: string): Promise<{ sites: { id: string; name: string }[]; entries: Entry[] }> {
-  const [s, e] = await Promise.all([
-    supabase.from("sites").select("id,name").eq("party_id", partyId).order("name"),
-    supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,entry_lines(material_id,quantity,unit,rate,gst_bp)").eq("party_id", partyId).eq("status", "active"),
-  ]);
-  if (s.error) throw s.error;
-  if (e.error) throw e.error;
-  return { sites: s.data ?? [], entries: (e.data ?? []).map(toEntry) };
+  const raw = await withCache(`pctx:${partyId}`, async () => {
+    const [s, e] = await Promise.all([
+      supabase.from("sites").select("id,name").eq("party_id", partyId).order("name"),
+      supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,entry_lines(material_id,quantity,unit,rate,gst_bp)").eq("party_id", partyId).eq("status", "active"),
+    ]);
+    if (s.error) throw s.error;
+    if (e.error) throw e.error;
+    return { s: s.data ?? [], e: e.data ?? [] };
+  });
+  return { sites: raw.s, entries: [...raw.e.map(toEntry), ...pendingAsEntries(getItems(), partyId)] };
 }
 
 export interface EntryDetail {
@@ -122,16 +149,16 @@ export const createSite = async (businessId: string, partyId: string, name: stri
   must(await supabase.from("sites").insert({ business_id: businessId, party_id: partyId, name }).select("id").single()).id as string;
 
 export async function loadUnderstandContext(): Promise<{ parties: PartyRef[]; materials: MaterialRef[] }> {
-  const [p, s, materials] = await Promise.all([
-    supabase.from("parties").select("id,name,nicknames"),
-    supabase.from("sites").select("id,name,party_id"),
-    loadMaterials(),
-  ]);
-  if (p.error) throw p.error;
-  if (s.error) throw s.error;
-  const parties: PartyRef[] = (p.data ?? []).map((x) => ({
+  const raw = await withCache("understand", async () => {
+    const [p, s] = await Promise.all([supabase.from("parties").select("id,name,nicknames"), supabase.from("sites").select("id,name,party_id")]);
+    if (p.error) throw p.error;
+    if (s.error) throw s.error;
+    return { p: p.data ?? [], s: s.data ?? [] };
+  });
+  const materials = await loadMaterials();
+  const parties: PartyRef[] = raw.p.map((x: any) => ({
     id: x.id, name: x.name, nicknames: x.nicknames ?? [],
-    sites: (s.data ?? []).filter((y) => y.party_id === x.id).map((y) => ({ id: y.id, name: y.name })),
+    sites: raw.s.filter((y: any) => y.party_id === x.id).map((y: any) => ({ id: y.id, name: y.name })),
   }));
   return { parties, materials };
 }

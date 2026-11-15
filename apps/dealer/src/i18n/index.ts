@@ -12,6 +12,9 @@ export type { Key };
 type Vars = Record<string, string | number>;
 const fill = (s: string, v?: Vars) => (v ? s.replace(/\{(\w+)\}/g, (_, k) => (k in v ? String(v[k]) : `{${k}}`)) : s);
 export const translate = (lang: Lang, key: Key, vars?: Vars) => fill(DICT[lang][key] ?? en[key] ?? key, vars);
+let uiNow: Lang = "en";
+/** For code outside components (error messages). Follows the app language setting. */
+export const translateNow = (key: Key, vars?: Vars) => translate(uiNow, key, vars);
 
 interface Ctx { ui: Lang; asst: Lang; setUi: (l: Lang) => void; setAsst: (l: Lang) => void }
 const I18n = createContext<Ctx>({ ui: "en", asst: "en", setUi: () => {}, setAsst: () => {} });
@@ -33,6 +36,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
   const setUi = useCallback((l: Lang) => { setUiState(l); AsyncStorage.setItem(K_UI, l).catch(() => {}); }, []);
   const setAsst = useCallback((l: Lang) => { setAsstState(l); AsyncStorage.setItem(K_ASST, l).catch(() => {}); }, []);
+  uiNow = ui;
   const value = useMemo(() => ({ ui, asst, setUi, setAsst }), [ui, asst, setUi, setAsst]);
   return createElement(I18n.Provider, { value }, children);
 }

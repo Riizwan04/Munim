@@ -2,8 +2,9 @@ import { useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { PRESETS } from "@munim/ledger-core";
 import { createBusinessWithPreset } from "./data";
-import { supabase } from "./supabase";
+import { requestSignOut } from "./offline/signout";
 import { useI18n } from "./i18n";
+import { fe } from "./errors";
 import { FONT, useTheme } from "./theme";
 import { Btn, Chip, Field, Row, Section } from "./ui";
 
@@ -18,7 +19,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [err, setErr] = useState("");
   async function go() {
     setBusy(true); setErr("");
-    try { await createBusinessWithPreset(name.trim(), phone.trim(), preset); onDone(); } catch (e: any) { setErr(e.message ?? String(e)); setBusy(false); }
+    try { await createBusinessWithPreset(name.trim(), phone.trim(), preset); onDone(); } catch (e: any) { setErr(fe(e)); setBusy(false); }
   }
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 20, gap: 20 }} keyboardShouldPersistTaps="handled">
@@ -31,7 +32,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       </Section>
       {err ? <Text style={{ color: t.due, fontSize: FONT.body }}>{err}</Text> : null}
       {busy ? <ActivityIndicator /> : <Row wrap={false}><Btn label={tr("ob.start")} disabled={!name.trim() || phone.trim().length < 8} onPress={go} /></Row>}
-      <Text onPress={() => supabase.auth.signOut()} style={{ color: t.muted, fontSize: FONT.small, textAlign: "center", padding: 12 }}>{tr("common.logout")}</Text>
+      <Text onPress={() => void requestSignOut()} style={{ color: t.muted, fontSize: FONT.small, textAlign: "center", padding: 12 }}>{tr("common.logout")}</Text>
     </ScrollView>
   );
 }
