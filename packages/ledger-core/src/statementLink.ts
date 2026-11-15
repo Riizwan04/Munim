@@ -7,7 +7,7 @@ import type { Entry, EntryType, PaymentMode } from "./types";
  * The customer's page uses buildStatement/statementText, so its numbers match the dealer's ledger exactly.
  */
 export interface PublicStatementPayload {
-  business: { name: string };
+  business: { name: string; tagline?: string };
   party: { name: string; opening_balance: number; language?: string | null };
   sites: { id: string; name: string }[];
   entries: {

@@ -2,6 +2,11 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import type { Overview, PartyRow } from "./data";
 import { useI18n } from "./i18n";
+/** Up to two letters for the round badge: "R.R Enterprises" -> "RR", "Sample Building Supplies" -> "SB". */
+export const monogram = (name: string) => {
+  const w = name.replace(/[^\p{L}\p{N}\s.]/gu, "").split(/[\s.]+/).filter(Boolean);
+  return ((w[0]?.[0] ?? "M") + (w.length > 1 ? w[1][0] : "")).toUpperCase();
+};
 import { Avatar, Logo, Tag } from "./Logo";
 import { rupee } from "./money";
 import { FONT, HEAD, useTheme } from "./theme";
@@ -34,11 +39,20 @@ export function PartyList({ data, err, onOpen, onAdd, onSettings, onRefresh }: {
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <View style={{ backgroundColor: t.hero, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16, borderBottomLeftRadius: 22, borderBottomRightRadius: 22, gap: 10 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <Logo size={34} />
-          <Text style={{ fontFamily: HEAD, fontSize: FONT.body + 1, color: t.heroFg, flex: 1 }} numberOfLines={1}>{data.business}</Text>
+          <Logo size={22} />
+          <Text style={{ fontFamily: HEAD, fontSize: 13, color: t.heroFg, opacity: 0.75, flex: 1, letterSpacing: 1.5 }}>MUNIM</Text>
           <Pressable onPress={onSettings} accessibilityRole="button" accessibilityLabel={tr("common.settings")} style={{ minWidth: 46, minHeight: 46, alignItems: "center", justifyContent: "center" }}>
             <Text style={{ fontSize: 24, color: t.heroFg, opacity: 0.9 }}>⚙</Text>
           </Pressable>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }} testID="biz-banner">
+          <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: t.saffron, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.35)" }}>
+            <Text style={{ fontFamily: HEAD, fontSize: 21, color: t.saffronFg }}>{monogram(data.business)}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: HEAD, fontSize: 24, lineHeight: 30, color: t.heroFg }} numberOfLines={2} testID="biz-name">{data.business}</Text>
+            {data.tagline ? <Text style={{ fontSize: 13.5, color: t.heroFg, opacity: 0.85 }} numberOfLines={1} testID="biz-tagline">{data.tagline}</Text> : null}
+          </View>
         </View>
         <View>
           <Text style={{ fontSize: 13, color: t.heroFg, opacity: 0.85 }}>{tr("home.receivable")}</Text>

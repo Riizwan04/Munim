@@ -90,6 +90,7 @@ export function PublicStatement({ token }: { token: string }) {
       {langChips}
       <View style={{ gap: 4 }}>
         <Text style={{ fontSize: FONT.small, color: t.muted }}>{T("ps.from", { business: d.business.name })}</Text>
+        {d.business.tagline ? <Text style={{ fontSize: FONT.small, color: t.muted }}>{d.business.tagline}</Text> : null}
         <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{T("ps.balanceOf", { name: d.party.name })}</Text>
       </View>
       <View style={{ gap: 2 }}>

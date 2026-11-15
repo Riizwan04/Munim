@@ -113,7 +113,7 @@ function AppInner() {
   else if (screen.name === "sync" && data) body = <SyncIssues parties={data.parties} onBack={() => setScreen({ name: "parties" })} />;
   else if (screen.name === "import" && data) body = <Import businessId={data.businessId} parties={data.parties} onClose={() => setScreen({ name: "reports" })} onDone={() => { refresh(); setRev((n) => n + 1); }} />;
   else if (screen.name === "reports") body = <Reports key={rev} onImport={() => setScreen({ name: "import" })} />;
-  else if (screen.name === "settings") body = <Settings onBack={() => setScreen({ name: "parties" })} />;
+  else if (screen.name === "settings") body = <Settings onBack={() => setScreen({ name: "parties" })} businessId={data?.businessId ?? ""} tagline={data?.tagline ?? ""} onSaved={refresh} />;
   else if (screen.name === "statement")
     body = <Statement party={fresh(screen.party)!} onBack={() => setScreen({ name: "ledger", party: screen.party })} />;
   else if (screen.name === "partyEdit")

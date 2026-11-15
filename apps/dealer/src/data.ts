@@ -9,7 +9,7 @@ export interface PartyRow {
   id: string; name: string; phone: string; opening: number; balance: number; creditLimit: number | null;
   nicknames: string[]; language: string; overdueDays: number | null;
 }
-export interface Overview { businessId: string; business: string; parties: PartyRow[]; todaySales: number; todayCollections: number }
+export interface Overview { businessId: string; business: string; tagline: string; parties: PartyRow[]; todaySales: number; todayCollections: number }
 export interface LedgerRow {
   key: string; entryId?: string; kind: "balance" | "line" | "payment" | "charge" | "total";
   date?: string; item: string; qty?: string; rate?: number; amount: number; site?: string; pending?: boolean;
@@ -24,7 +24,8 @@ const toEntry = (r: any): Entry => ({
 
 const overviewRaw = () => withCache("overview", async () => {
     const [b, p, e] = await Promise.all([
-      supabase.from("businesses").select("id,name").limit(1).maybeSingle(),
+      // until migration 0006 is run the tagline column does not exist: fall back to the plain query
+      supabase.from("businesses").select("id,name,tagline").limit(1).maybeSingle().then((r) => r.error ? supabase.from("businesses").select("id,name").limit(1).maybeSingle() : r),
       supabase.from("parties").select("id,name,phone,opening_balance,credit_limit,nicknames,preferred_language"),
       supabase.from("entries").select("id,party_id,site_id,type,entry_date,status,amount,payment_mode,cheque_bounced,entry_lines(material_id,quantity,unit,rate,gst_bp)"),
     ]);
@@ -52,7 +53,7 @@ export async function loadParties(): Promise<Overview> {
       nicknames: x.nicknames ?? [], language: x.preferred_language ?? "hi", overdueDays: st.overdueDays,
     };
   }).sort((a, b) => b.balance - a.balance);
-  return { businessId: b.data?.id ?? "", business: b.data?.name ?? "Munim", parties, todaySales, todayCollections };
+  return { businessId: b.data?.id ?? "", business: b.data?.name ?? "Munim", tagline: (b.data as any)?.tagline ?? "", parties, todaySales, todayCollections };
 }
 
 const trim = (n: number) => String(Math.round(n * 1000) / 1000);
@@ -302,4 +303,9 @@ export async function loadVoiceContext(): Promise<VoiceContext> {
   const info: VoiceContext["info"] = {};
   for (const x of raw.p) info[x.id] = { name: x.name, opening: Number(x.opening_balance), creditLimit: x.credit_limit === null ? null : Number(x.credit_limit) };
   return { businessId: raw.b?.id ?? "", parties: u.parties, materials: u.materials, info, entries };
+}
+
+/** The owner edits the line shown under the business name (RLS lets only the owner update the business). */
+export async function saveTagline(businessId: string, tagline: string): Promise<void> {
+  must(await supabase.from("businesses").update({ tagline: tagline.trim().slice(0, 60) }).eq("id", businessId).select("id"));
 }
