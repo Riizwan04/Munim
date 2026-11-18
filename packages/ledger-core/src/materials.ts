@@ -29,7 +29,7 @@ export function matchMaterial(term: string, materials: MaterialRef[]): MaterialM
   if (!t) return { kind: "none" };
   const exact = materials.filter((m) => [m.name, ...m.localNames].some((n) => norm(n) === t));
   if (exact.length === 1) return { kind: "match", material: exact[0]! };
-  if (exact.length > 1) return { kind: "ambiguous", options: exact, reason: "name" };
+  if (exact.length > 1) return exact.every((m) => norm(m.name) === norm(exact[0]!.name)) ? { kind: "match", material: exact[0]! } : { kind: "ambiguous", options: exact, reason: "name" }; // "ACC cement" saved twice is one item
   const inCategory = materials.filter((m) => m.category && norm(m.category) === t);
   if (inCategory.length === 1) return { kind: "match", material: inCategory[0]! };
   if (inCategory.length > 1) return { kind: "ambiguous", options: inCategory, reason: "brand" };

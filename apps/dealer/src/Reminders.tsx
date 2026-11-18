@@ -90,9 +90,9 @@ export function Reminders({ businessId, business, parties, only, onClose }: {
 /** One person at a time: edit the message, open WhatsApp, then confirm it was really sent. */
 function Queue({ business, businessId, people, onDone, onBack }: { business: string; businessId: string; people: PartyRow[]; onDone: (sentIds: string[]) => void; onBack: () => void }) {
   const t = useTheme();
-  const { tr } = useI18n();
+  const { tr, ui } = useI18n();
   const [i, setI] = useState(0);
-  const [lang, setLang] = useState<Lang>(people[0] ? asLang(people[0].language) : "hi");
+  const lang: Lang = ui; // written matter follows the one written-language setting (English unless changed in Settings)
   const [text, setText] = useState("");
   const [opened, setOpened] = useState(false);
   const [sent, setSent] = useState<string[]>([]);
@@ -101,7 +101,7 @@ function Queue({ business, businessId, people, onDone, onBack }: { business: str
   const [warn, setWarn] = useState("");
   const p = people[i];
   const make = (party: PartyRow, l: Lang) => reminderMessage({ lang: l, businessName: business, partyName: party.name, balance: party.balance, overdueDays: party.overdueDays });
-  useEffect(() => { if (p) { const l = asLang(p.language); setLang(l); setText(make(p, l)); setOpened(false); setWarn(""); } }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (p) { setText(make(p, lang)); setOpened(false); setWarn(""); } }, [i]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!p) return (
     <View style={{ flex: 1, backgroundColor: t.bg, padding: 20, gap: 16, justifyContent: "center" }}>
@@ -118,7 +118,6 @@ function Queue({ business, businessId, people, onDone, onBack }: { business: str
       <Text style={{ fontSize: FONT.small, color: t.muted }}>{tr("rem.of", { i: i + 1, n: people.length })}</Text>
       <Text style={{ fontFamily: HEAD, fontSize: FONT.title, color: t.ink }}>{p.name}</Text>
       <Text style={{ fontSize: FONT.body, color: t.due, fontWeight: "700" }}>{tr("rem.due", { v: rupee(p.balance), phone: p.phone })}</Text>
-      <Row>{([["hi", "Hindi"], ["mr", "Marathi"], ["en", "English"]] as const).map(([k, l]) => <Chip key={k} label={l} on={lang === k} onPress={() => { setLang(k); setText(make(p, k)); }} />)}</Row>
       <TextInput nativeID="rem-text" multiline value={text} onChangeText={setText}
         style={{ minHeight: 160, textAlignVertical: "top", borderWidth: 2, borderColor: t.line, backgroundColor: t.surface, color: t.fg, borderRadius: 12, padding: 14, fontSize: FONT.body }} />
       {warn ? <Text style={{ color: t.due, fontSize: FONT.small }}>{warn}</Text> : null}

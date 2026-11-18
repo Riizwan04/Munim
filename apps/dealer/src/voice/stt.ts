@@ -19,6 +19,7 @@ export type ListenFailure = "no-speech" | "denied" | "network" | "unsupported" |
 export type ListenResult = { ok: true; text: string } | { ok: false; reason: ListenFailure };
 export interface Listener { promise: Promise<ListenResult>; stop(): void; abort(): void }
 
+const END_SILENCE_MS = 1600;   // how long a silence after the last words means "I am done"
 const mapError = (code: string): ListenFailure =>
   code === "not-allowed" || code === "service-not-allowed" ? "denied" : code === "no-speech" || code === "speech-timeout" ? "no-speech"
   : code === "network" ? "network" : code === "language-not-supported" ? "language" : code === "aborted" ? "aborted" : "error";
@@ -29,19 +30,28 @@ export function listen(lang: SpeakLang, onPartial?: (t: string) => void): Listen
   let settle!: (r: ListenResult) => void;
   const promise = new Promise<ListenResult>((res) => { settle = res; });
   if (!m || !sttAvailable()) { settle({ ok: false, reason: "unsupported" }); return { promise, stop() {}, abort() {} }; }
-  let final = "", partial = "", settled = false;
+  // A natural sentence has pauses ("Santosh ko … dus bag … ACC cement … teen sau nabbe"). The phone's recogniser may end at the first pause, so
+  // every finished piece is kept and joined, and listening only stops after a real silence (END_SILENCE_MS) following speech.
+  const finals: string[] = [];
+  let partial = "", settled = false;
   const subs: { remove(): void }[] = [];
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const done = (r: ListenResult) => { if (settled) return; settled = true; clearTimeout(timer); subs.forEach((s) => s.remove()); settle(r); };
-  subs.push(m.addListener("result", (e: any) => { const text: string = e?.results?.[0]?.transcript ?? ""; if (e?.isFinal) final = text; else { partial = text; onPartial?.(text); } }));
-  subs.push(m.addListener("error", (e: any) => done({ ok: false, reason: mapError(String(e?.error ?? "")) })));
-  subs.push(m.addListener("end", () => { const t = (final || partial).trim(); done(t ? { ok: true, text: t } : { ok: false, reason: "no-speech" }); }));
+  let timer: ReturnType<typeof setTimeout> | undefined, idle: ReturnType<typeof setTimeout> | undefined;
+  const done = (r: ListenResult) => { if (settled) return; settled = true; clearTimeout(timer); clearTimeout(idle); subs.forEach((s) => s.remove()); settle(r); };
+  const stopSoon = (ms: number) => { clearTimeout(idle); idle = setTimeout(() => { try { m.stop(); } catch { /* already ended */ } }, ms); };
+  subs.push(m.addListener("result", (e: any) => {
+    const text: string = e?.results?.[0]?.transcript ?? "";
+    if (e?.isFinal) { if (text.trim()) finals.push(text.trim()); partial = ""; stopSoon(END_SILENCE_MS); }
+    else { partial = text; stopSoon(END_SILENCE_MS + 1200); }
+    onPartial?.([...finals, partial].filter(Boolean).join(" "));
+  }));
+  subs.push(m.addListener("error", (e: any) => { const t = [...finals, partial].join(" ").trim(); if (t && String(e?.error) !== "not-allowed") done({ ok: true, text: t }); else done({ ok: false, reason: mapError(String(e?.error ?? "")) }); }));
+  subs.push(m.addListener("end", () => { const t = [...finals, partial].join(" ").replace(/\s+/g, " ").trim(); done(t ? { ok: true, text: t } : { ok: false, reason: "no-speech" }); }));
   (async () => {
     try {
       const p = await m.requestPermissionsAsync();
       if (!p?.granted) { done({ ok: false, reason: "denied" }); return; }
-      m.start({ lang: LOCALE[lang], interimResults: true, continuous: false, maxAlternatives: 1, androidIntentOptions: { EXTRA_LANGUAGE_MODEL: "web_search" } });
-      timer = setTimeout(() => { try { m.stop(); } catch { /* already ended */ } }, 15000);
+      m.start({ lang: LOCALE[lang], interimResults: true, continuous: true, maxAlternatives: 1, androidIntentOptions: { EXTRA_LANGUAGE_MODEL: "web_search" } });
+      timer = setTimeout(() => { try { m.stop(); } catch { /* already ended */ } }, 30000);
     } catch { done({ ok: false, reason: "error" }); }
   })();
   return { promise, stop: () => { try { m.stop(); } catch { /* */ } }, abort: () => { try { m.abort(); } catch { /* */ } done({ ok: false, reason: "aborted" }); } };

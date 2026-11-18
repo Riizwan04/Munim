@@ -2,7 +2,7 @@ import type { DraftLine } from "./entryDraft";
 import { matchMaterial, prettyItemName, type MaterialRef } from "./materials";
 import { foldDevanagari, hasToken, isDevanagari, sameWord, skeleton, stems } from "./phonetic";
 import { isDateWord, THIS } from "./assistant";
-import { romanizeWord } from "./romanize";
+import { loanword, romanizeWord } from "./romanize";
 import { isNumberWord, scanNumbers, tokenize, type NumberSpan } from "./spoken";
 import type { EntryType, PaymentMode } from "./types";
 
@@ -67,10 +67,19 @@ const UNIT_ALIASES: Record<string, string> = {
   }).map(([k, v]) => [foldDevanagari(k), v])),
 };
 /** Canonical unit for a spoken word (Roman or Devanagari, also with a glued ending), or undefined. */
-export const unitOf = (token: string): string | undefined => { for (const x of stems(token)) if (x in UNIT_ALIASES) return UNIT_ALIASES[x]; return undefined; };
+export const unitOf = (token: string): string | undefined => {
+  for (const x of stems(token)) { if (x in UNIT_ALIASES) return UNIT_ALIASES[x]; if (isDevanagari(x) && /्स$|स$/.test(x) && x.replace(/्?स$/, "") in UNIT_ALIASES) return UNIT_ALIASES[x.replace(/्?स$/, "")]; } // "बैग्स" is "bags"
+  return undefined;
+};
 export const normalizeUnit = (u: string) => unitOf(u.toLowerCase()) ?? u.toLowerCase();
 
 const fmt = (n: number) => String(Math.round(n * 1000) / 1000);
+
+/** "एसीसी सीमेंट" romanises to "ACC cement": the saved item of that name, if there is one. */
+function sameNameItem(text: string, materials: MaterialRef[]): MaterialRef | undefined {
+  const cand = prettyItemName(tokenize(text).map(romanizeWord)).toLowerCase();
+  return materials.find((m) => m.name.trim().toLowerCase() === cand);
+}
 
 /** Two Roman spellings of one sound ("waddy" / "waddi"): same consonants and the same first letter. */
 const softSame = (a: string, b: string) => !isDevanagari(a) && !isDevanagari(b) && a[0] === b[0] && skeleton(a).length >= 2 && skeleton(a) === skeleton(b);
@@ -121,6 +130,7 @@ export function resolveUtterance(parsed: ParsedUtterance, ctx: UnderstandContext
           const near = soundsLike(it.materialText, ctx.materials);
           if (near.length === 1) material = near[0];
           else if (near.length > 1) questions.push({ kind: "material", line: i, spoken: it.materialText, options: near });
+          else if (tokenize(it.materialText).length && (material = sameNameItem(it.materialText, ctx.materials))) { /* said in Devanagari, saved in English letters: the same item */ }
           else if (tokenize(it.materialText).length) { fresh = true; newItems.push({ line: i, name: prettyItemName(tokenize(it.materialText).map(romanizeWord)), unit: it.unit ? normalizeUnit(it.unit) : undefined }); }
           else questions.push({ kind: "material", line: i, spoken: it.materialText, options: [] });
         }
@@ -164,7 +174,7 @@ const SITE_WORDS = ["site", "saite"];
 const isSiteWord = (w: string) => SITE_WORDS.includes(w) || /^(साइट|साईट)/.test(w);
 const isKoNeLa = (w: string) => ["ko", "ne", "la", "को", "ने", "ला"].includes(w);
 const hasNe = (w: string) => w === "ne" || w === "ने" || (isDevanagari(w) && w.length > 2 && w.endsWith("ने"));
-const FILLER = new Set(["ka", "ki", "ke", "rate", "hisab", "se", "mein", "me", "per", "at", "of", "ne", "ko", "la", "diya", "dila", "diye", "bheja", "gave", "to", "from", "pe", "var", "site", "kar", "do", "kam", "jodo", "add", "rupay", "rupaye", "rs", "ruppe"]);
+const FILLER = new Set(["purchased", "purchase", "bought", "buy", "sold", "sell", "for", "today", "at", "of", "by", "with", "each", "only", "order", "ordered", "took", "taken", "give", "gave", "given", "need", "needed", "liye", "liya", "kharide", "kharida", "becha", "bheje", "mein", "mein", "ka", "ki", "ke", "rate", "hisab", "se", "mein", "me", "per", "at", "of", "ne", "ko", "la", "diya", "dila", "diye", "bheja", "gave", "to", "from", "pe", "var", "site", "kar", "do", "kam", "jodo", "add", "rupay", "rupaye", "rs", "ruppe"]);
 
 const FILLER_DEV = new Set(fold(["का", "की", "के", "रेट", "भाव", "दर", "हिसाब", "से", "में", "पर", "को", "ने", "दिया", "दिये", "दिए", "लिखो", "लिख", "एंट्री", "एन्ट्री", "जोड़ो", "जोडो", "कर", "दो", "रुपये", "चाहिए", "भेजा", "माल", "सामान"]).concat(["likho", "entry", "dena", "de", "liya", "chahiye", "maal", "saman", "samaan", "sale", "kharida", "becha"]));
 
@@ -212,7 +222,8 @@ export function heuristicUnderstand(text: string, ctx: UnderstandContext): Parse
   const clauses = text.replace(/(^|\s)(और|आणि|तथा|व)(?=\s)/g, "$1,").replace(/[।॥]/g, ",").split(/(?<!\d),|,(?!\d)|;|\.(?=\s|$)|\b(?:aur|and|ani|tatha)\b/i).map((c) => c.trim()).filter(Boolean);
   const entries: ParsedEntry[] = [];
   for (const clause of clauses) {
-    const tokens = tokenize(clause);
+    // English words and initials that a Hindi-set phone wrote in Devanagari ("बैग्स", "एसीसी", "टुडे") are read as English
+    const tokens = tokenize(clause).map((w) => loanword(w) ?? w);
     const mentions = findMentions(tokens, ctx.materials);
     // a number that is part of an item name ("Block 6 inch") is not a quantity or a rate
     const spans = scanNumbers(tokens).filter((sp) => !mentions.some((m) => sp.start >= m.start && sp.end <= m.end));

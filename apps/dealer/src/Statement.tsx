@@ -22,12 +22,12 @@ function fromDate(p: Period): string | undefined {
 /** Statement for one party (FR-51/62): choose period, site and language, then send on WhatsApp, share, or make a PDF. */
 export function Statement({ party, onBack }: { party: PartyRow; onBack: () => void }) {
   const t = useTheme();
-  const { tr } = useI18n();
+  const { tr, ui } = useI18n();
   const [data, setData] = useState<StatementData | null>(null);
   const [err, setErr] = useState("");
   const [period, setPeriod] = useState<Period>("month");
-  const [siteId, setSiteId] = useState<string | null>(null);
-  const [lang, setLang] = useState<Lang>((["hi", "mr", "en"].includes(party.language) ? party.language : "hi") as Lang);
+  const siteId = null;          // the statement is always for the whole account
+  const lang: Lang = ui;        // written matter follows the one written-language setting (English unless changed in Settings)
   const [note, setNote] = useState("");
   const [days, setDays] = useState(30);
   const [links, setLinks] = useState<LinkRow[]>([]);
@@ -68,14 +68,6 @@ export function Statement({ party, onBack }: { party: PartyRow; onBack: () => vo
             <Chip label={tr("st.30")} on={period === "30"} onPress={() => setPeriod("30")} />
             <Chip label={tr("st.all")} on={period === "all"} onPress={() => setPeriod("all")} />
           </Row>
-        </Section>
-        {data.sites.length > 0 && (
-          <Section title={tr("st.site")}>
-            <Row><Chip label={tr("st.allSites")} on={siteId === null} onPress={() => setSiteId(null)} />{data.sites.map((s) => <Chip key={s.id} label={s.name} on={siteId === s.id} onPress={() => setSiteId(s.id)} />)}</Row>
-          </Section>
-        )}
-        <Section title={tr("st.lang")}>
-          <Row>{([["hi", "हिन्दी"], ["mr", "मराठी"], ["en", "English"]] as const).map(([k, l]) => <Chip key={k} label={l} on={lang === k} onPress={() => setLang(k)} />)}</Row>
         </Section>
 
         <StatementCard stmt={stmt} emptyText={tr("st.empty")} />

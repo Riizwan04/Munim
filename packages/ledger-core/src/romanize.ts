@@ -9,9 +9,11 @@ const WORDS: Record<string, string> = {
   सीमेंट: "cement", सिमेंट: "cement", सीमेन्ट: "cement", ईंट: "brick", ईट: "brick", रेत: "sand", रेती: "sand", वाळू: "sand", खडी: "khadi", खड़ी: "khadi", गिट्टी: "gravel",
   ब्लॉक: "block", ब्लाक: "block", टाइल: "tile", टाइल्स: "tiles", पेंट: "paint", पेन्ट: "paint", पाइप: "pipe", पाईप: "pipe", तार: "wire", लोहा: "iron", सरिया: "steel bar", सळई: "steel bar",
   कील: "nails", चूना: "lime", प्लाईवुड: "plywood", ब्रास: "brass", वॉटरप्रूफिंग: "waterproofing", केमिकल: "chemical", सुपर: "super", गोल्ड: "gold", प्लस: "plus", प्रीमियम: "premium",
-  नंबर: "number", इंच: "inch", मोटा: "thick", पतला: "thin", ग्रे: "grey", व्हाइट: "white", रेड: "red", ब्लैक: "black", रोड: "road", साइट: "site",
+  पर्चेस्ड: "purchased", पर्चेस: "purchase", परचेज: "purchase", पर्चेज: "purchase", बॉट: "bought", बाउट: "bought", फॉर: "for", एट: "at", टुडे: "today", येस्टरडे: "yesterday", बैग्स: "bags", बैग्ज: "bags", रेट: "rate", प्राइस: "price", ऑर्डर: "order", सोल्ड: "sold", नंबर: "number", इंच: "inch", मोटा: "thick", पतला: "thin", ग्रे: "grey", व्हाइट: "white", रेड: "red", ब्लैक: "black", रोड: "road", साइट: "site",
 };
 const FOLDED: Record<string, string> = Object.fromEntries(Object.entries(WORDS).map(([k, v]) => [foldDevanagari(k), v]));
+
+const HINDI_WORDS = new Set(["ईंट", "ईट", "रेत", "रेती", "वाळू", "खडी", "खड़ी", "गिट्टी", "तार", "लोहा", "सरिया", "सळई", "कील", "चूना", "मोटा", "पतला"].map(foldDevanagari));
 
 // letter names as spoken in English: "एसीसी" = A C C
 const LETTERS: Record<string, string> = Object.fromEntries(Object.entries({
@@ -79,4 +81,13 @@ export function romanizeName(text: string): string {
     const r = romanizeWord(w);
     return r === r.toUpperCase() && r.length > 1 ? r : r.charAt(0).toUpperCase() + r.slice(1);
   }).join(" ");
+}
+
+/** A Devanagari spelling of an English word or of initials ("बैग्स" → "bags", "एसीसी" → "acc"), or null for any other word. Used to read dictated sentences. */
+export function loanword(word: string): string | null {
+  if (!isDevanagari(word)) return null;
+  const w = foldDevanagari(word);
+  if (HINDI_WORDS.has(w)) return null;                 // real Hindi/Marathi shop words (ईंट, गिट्टी…) stay as they are for matching
+  const hit = FOLDED[w] ?? acronym(w);
+  return hit ? hit.toLowerCase() : null;
 }

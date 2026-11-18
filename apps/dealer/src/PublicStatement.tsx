@@ -57,7 +57,7 @@ export function PublicStatement({ token }: { token: string }) {
         setPhase(r.error === "pin_required" || r.error === "wrong_pin" ? "pin" : r.error === "locked" ? "locked" : "invalid");
       } else {
         setData(r); setPhase("ready");
-        const l = r.party.language; if (l === "hi" || l === "mr" || l === "en") setLang(l);
+        /* the customer page opens in English; the customer can switch language with the chips */
       }
     } catch { setPhase("error"); }
     setBusy(false);

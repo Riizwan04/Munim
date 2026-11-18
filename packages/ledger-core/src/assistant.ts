@@ -64,9 +64,9 @@ const MONTHS: Record<string, number> = Object.fromEntries(Object.entries({
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fromIso = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y!, m! - 1, d!); };
 const addDays = (s: string, n: number) => { const d = fromIso(s); d.setDate(d.getDate() + n); return iso(d); };
-const YESTERDAY = S(["yesterday", "kal", "कल", "कालच", "काल"]);
+const YESTERDAY = S(["yesterday", "kal", "कल", "कालच", "काल", "येस्टरडे"]);
 const DAYBEFORE = S(["parso", "parson", "परसों", "परसो", "परवा"]);
-const TODAYW = S(["today", "aaj", "आज", "आत्ता"]);
+const TODAYW = S(["today", "aaj", "आज", "आत्ता", "टुडे"]);
 
 /** "yesterday / kal / parso / 3 days ago / 12 November / 12th / 12 tarikh" → YYYY-MM-DD, or null when no date was said. Future dates are not accepted. */
 export function parseSpokenDate(text: string, today: string): string | null {

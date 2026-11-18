@@ -13,7 +13,7 @@ import { supabase } from "./supabase";
 
 export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { entryId: string; party: PartyRow; onBack: () => void; onEdit: () => void; onChanged: () => void }) {
   const t = useTheme();
-  const { tr } = useI18n();
+  const { tr, ui } = useI18n();
   const [d, setD] = useState<Detail | null>(null);
   const [err, setErr] = useState("");
   const [cancelling, setCancelling] = useState(false);
@@ -35,7 +35,7 @@ export function EntryDetail({ entryId, party, onBack, onEdit, onChanged }: { ent
           <Row wrap={false}><Btn label={tr("detail.sendWa")} onPress={async () => {
             try {
               const b = await supabase.from("businesses").select("name").limit(1).maybeSingle();
-              const lang = (["hi", "mr", "en"].includes(party.language) ? party.language : "hi") as Lang;
+              const lang = ui as Lang; // written matter follows the one written-language setting
               const msg = entryMessage({
                 lang, businessName: b.data?.name ?? "Munim", partyName: party.name, date: d.date, siteName: d.siteName,
                 kind: d.type === "payment" ? "payment" : d.type === "sale" ? "sale" : "other",

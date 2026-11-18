@@ -71,7 +71,7 @@ export const en = {
   "pe.back": "‹ Back", "pe.title": "Party details", "pe.name": "Name", "pe.phone": "Phone", "pe.nick": "Nicknames (comma separated)",
   "pe.limit": "Credit limit (₹, blank = no limit)", "pe.opening": "Opening balance (₹)", "pe.lang": "Message language",
   // settings
-  "set.title": "Settings", "set.appLang": "App language", "set.asstLang": "Munim speaks and listens in",
+  "set.title": "Settings", "set.appLang": "Language of everything written in the app", "set.asstLang": "Munim speaks and listens in",
   "set.note": "Munim talks to you and listens in this language. Everything written on the screen stays in English. Hindi and English can be mixed in one sentence.",
   "set.msgNote": "Messages to parties use each party's own language (set in the party's details).",
   "tab.reports": "Reports",
