@@ -175,7 +175,7 @@ function AppInner() {
           <BottomNav active={screen.name} onTalk={() => setTalk({})}
             onGo={(k) => setScreen(k === "items" ? { name: "items" } : k === "reminders" ? { name: "reminders" } : k === "reports" ? { name: "reports" } : { name: "parties" })} />
         ) : null}
-        {ready && !talk && !showNav && screen.name !== "sync" ? (
+        {ready && !talk && !showNav && screen.name !== "sync" && screen.name !== "settings" ? (
           <Pressable onPress={() => setTalk({})} accessibilityRole="button" accessibilityLabel={tr("talk.home")} testID="talk-fab"
             style={{ position: "absolute", right: 16, bottom: 20, width: 58, height: 58, borderRadius: 29, backgroundColor: t.saffron, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: t.bg, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
             <Text style={{ fontSize: 26 }}>🎙</Text>
