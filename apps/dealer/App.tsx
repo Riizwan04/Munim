@@ -50,7 +50,7 @@ type Screen =
   | { name: "talk" }
   | { name: "items" }
   | { name: "reports" }
-  | { name: "import" }
+  | { name: "import"; party?: PartyRow }
   | { name: "sync" }
   | { name: "settings" }
   | { name: "reminders"; only?: PartyRow }
@@ -121,7 +121,7 @@ function AppInner() {
     body = <Reminders businessId={data.businessId} business={data.business} parties={data.parties} only={screen.only}
       onClose={async () => { await refresh(); setScreen(screen.only ? { name: "ledger", party: screen.only } : { name: "parties" }); }} />;
   else if (screen.name === "sync" && data) body = <SyncIssues parties={data.parties} onBack={() => setScreen({ name: "parties" })} />;
-  else if (screen.name === "import" && data) body = <Import businessId={data.businessId} parties={data.parties} onClose={() => setScreen({ name: "reports" })} onDone={() => { refresh(); setRev((n) => n + 1); }} />;
+  else if (screen.name === "import" && data) body = <Import businessId={data.businessId} parties={data.parties} initialParty={screen.party ? fresh(screen.party) : undefined} onClose={() => setScreen(screen.party ? { name: "ledger", party: screen.party } : { name: "reports" })} onDone={() => { refresh(); setRev((n) => n + 1); }} />;
   else if (screen.name === "reports") body = <Reports key={rev} onImport={() => setScreen({ name: "import" })} />;
   else if (screen.name === "settings") body = <Settings onBack={() => setScreen({ name: "parties" })} businessId={data?.businessId ?? ""} tagline={data?.tagline ?? ""} business={data?.business ?? ""} assistantName={data?.assistantName ?? ""} onSaved={refresh} handsFree={handsFree} onHandsFree={changeHandsFree} />;
   else if (screen.name === "statement")
@@ -142,7 +142,7 @@ function AppInner() {
       onChanged={async () => { await refresh(); setRev((n) => n + 1); setScreen({ name: "ledger", party: screen.party }); }} />;
   else if (screen.name === "ledger") {
     const p = fresh(screen.party)!;
-    body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} onEditParty={() => setScreen({ name: "partyEdit", party: p })} onStatement={() => setScreen({ name: "statement", party: p })} onRemind={() => setScreen({ name: "reminders", only: p })} />;
+    body = <Ledger key={rev} party={p} onBack={() => setScreen({ name: "parties" })} onAdd={() => setScreen({ name: "add", party: p })} onOpen={(id) => setScreen({ name: "detail", party: p, entryId: id })} onEditParty={() => setScreen({ name: "partyEdit", party: p })} onStatement={() => setScreen({ name: "statement", party: p })} onRemind={() => setScreen({ name: "reminders", only: p })} onOldEntries={() => setScreen({ name: "import", party: p })} />;
   } else if (screen.name === "items" && data) body = <Items businessId={data.businessId} />;
   else body = <PartyList data={data} err={err} onRefresh={refresh} onOpen={(p) => setScreen({ name: "ledger", party: p })} onAdd={() => setScreen({ name: "add" })} onSettings={() => setScreen({ name: "settings" })} />;
 
@@ -175,7 +175,7 @@ function AppInner() {
           <BottomNav active={screen.name} onTalk={() => setTalk({})}
             onGo={(k) => setScreen(k === "items" ? { name: "items" } : k === "reminders" ? { name: "reminders" } : k === "reports" ? { name: "reports" } : { name: "parties" })} />
         ) : null}
-        {ready && !talk && !showNav && screen.name !== "sync" && screen.name !== "settings" ? (
+        {ready && !talk && !showNav && screen.name !== "sync" && screen.name !== "settings" && screen.name !== "import" ? (
           <Pressable onPress={() => setTalk({})} accessibilityRole="button" accessibilityLabel={tr("talk.home")} testID="talk-fab"
             style={{ position: "absolute", right: 16, bottom: 20, width: 58, height: 58, borderRadius: 29, backgroundColor: t.saffron, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: t.bg, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
             <Text style={{ fontSize: 26 }}>🎙</Text>

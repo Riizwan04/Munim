@@ -189,6 +189,8 @@ export const saveMaterial = async (businessId: string, m: { id?: string; name: s
   if (m.id) must(await supabase.from("materials").update(row).eq("id", m.id).select("id"));
   else must(await supabase.from("materials").insert({ ...row, business_id: businessId }).select("id"));
 };
+/** "Purana baaki": the balance a customer already had before the app. Money in paise. */
+export const setOpeningBalance = async (partyId: string, paise: number) => { must(await supabase.from("parties").update({ opening_balance: paise }).eq("id", partyId).select("id")); };
 export const updateParty = async (id: string, v: { name: string; phone: string; nicknames: string[]; creditLimit: number | null; opening: number; language: string }) => {
   must(await supabase.from("parties").update({ name: romanizeName(v.name), phone: v.phone, nicknames: v.nicknames, credit_limit: v.creditLimit, opening_balance: v.opening, preferred_language: v.language }).eq("id", id).select("id"));
 };

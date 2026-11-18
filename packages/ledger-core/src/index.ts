@@ -24,3 +24,4 @@ export * from "./notice";
 export * from "./romanize";
 export * from "./assistant";
 export * from "./ask";
+export * from "./importTable";

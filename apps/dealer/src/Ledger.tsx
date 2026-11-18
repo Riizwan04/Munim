@@ -11,7 +11,7 @@ import { Avatar } from "./Logo";
 // Fits a phone with no sideways scroll: Item takes the leftover width; the site shows as a small line under the item.
 const W = { date: 64, qty: 86, rate: 60, amt: 90 };
 
-export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement, onRemind }: { party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void; onEditParty: () => void; onStatement: () => void; onRemind: () => void }) {
+export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement, onRemind, onOldEntries }: { onOldEntries?: () => void; party: PartyRow; onBack: () => void; onAdd: () => void; onOpen: (entryId: string) => void; onEditParty: () => void; onStatement: () => void; onRemind: () => void }) {
   const t = useTheme();
   const { tr } = useI18n();
   const itemLabel = (it: string) => (it === "@balance" ? tr("row.balance") : it === "@total" ? tr("row.total") : it.startsWith("@mode:") ? tr(`mode.${it.slice(6)}` as never) : it === "@charge" ? tr("row.charge") : it === "@discount" ? tr("row.discount") : it === "@return" ? tr("row.return") : it);
@@ -82,6 +82,11 @@ export function Ledger({ party, onBack, onAdd, onOpen, onEditParty, onStatement,
               );
             })}
           </View>
+          {onOldEntries ? (
+            <Pressable onPress={onOldEntries} accessibilityRole="button" testID="old-entries-link" style={{ minHeight: 48, justifyContent: "center", paddingVertical: 10 }}>
+              <Text style={{ fontSize: FONT.small, color: t.accent, fontWeight: "700", textAlign: "center" }}>{tr("im2.oldLink")}</Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
       )}
     </View>
